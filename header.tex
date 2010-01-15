@@ -1,0 +1,145 @@
+\documentclass[final]{nagauth}
+%\documentclass{nagauth}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{floatrow}
+\floatsetup[table]{style=plaintop,font=small}
+%\captionsetup{font=small}
+
+%\def\baselinestretch{2}
+
+\usepackage{ifdraft}
+\ifoptionfinal
+{\newcommand{\draft}[1]{}}
+{\newcommand{\draft}[1]{{#1}}}
+
+
+% microtypography, makes stuff prettier
+% expansion doesn't work with the current combo of fonts+diff
+\usepackage[expansion=false]{microtype}
+
+\usepackage[numbers]{natbib}
+\usepackage{graphicx,subfig}
+\usepackage{amsmath,amssymb}
+\allowdisplaybreaks[1] % allow, but prefer not to, page break in a multiline eqn
+\usepackage{tikz}
+\usetikzlibrary{snakes,patterns}
+
+\usepackage{booktabs}
+
+%\usepackage[misc]{ifsym} \newcommand\envelope\Letter
+
+\usepackage{color}
+\definecolor{dimbg}{gray}{.93}
+\definecolor{dimfg}{gray}{.2}
+\makeatletter\newenvironment{graybox}{%
+  \begin{lrbox}{\@tempboxa}\begin{minipage}{\columnwidth}}{\end{minipage}\end{lrbox}%
+  \colorbox{dimbg}{\usebox{\@tempboxa}}
+}\makeatother
+
+\newcommand   {\R}[1]   {\text{#1}}       % (math) roman
+\newcommand   {\del}    {\partial}
+\newcommand   {\V}[1]   {\mathbf{#1}}            % vector
+\newcommand   {\VV}[1]  {\mathrm{\bf #1}}           % tensor
+\newcommand   {\D}      {\,\mathrm{d}}
+
+\newcommand   {\X}[1]   {\mathrm{#1}} % vector (1D matrix)
+\newcommand   {\M}[1]   {\mathrm{#1}} % matrix
+\newcommand   {\tM}[1]  {\tilde{\M{#1}}}
+\newcommand   {\MM}[1]  {\mathcal{#1}} % block matrix
+
+\newcommand   {\T}[2][]   {#2^{\!\mathsf{#1T}}}
+\newcommand   {\norm}[1]{\lVert#1\rVert}
+
+\let\oLambda\Lambda	\renewcommand\Lambda{\VV{\oLambda}}
+\let\onabla\nabla	\renewcommand\nabla{\V{\onabla}}
+\newcommand\U{\V{u}}
+
+
+\DeclareMathOperator{\diag}{diag}
+
+\newcommand {\refsec}[1] {\ERROR}
+\newcommand {\refeq}[1]  {Equation~\eqref{eq:#1}}
+\newcommand {\refeqs}[2] {Equations~\eqref{eq:#1} and~\eqref{eq:#2}}
+\newcommand {\refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
+\newcommand {\Refeq}[1]  {Equation~\eqref{eq:#1}}
+\newcommand {\reffig}[1] {Figure~\ref{fig:#1}}
+\newcommand {\reffigs}[2]{Figures~\ref{fig:#1} and~\ref{fig:#2}}
+\newcommand {\Reffig}[1] {Figure~\ref{fig:#1}}
+\newcommand {\reftab}[1] {Table~\ref{tab:#1}}
+\newcommand {\Reftab}[1] {Table~\ref{tab:#1}}
+\newcommand {\reftabs}[2]{Tables~\ref{tab:#1} and~\ref{tab:#2}}
+
+
+\newcommand  {\todo}[1]    {\draft{\noindent\begin{graybox}{\small #1}\end{graybox}}}
+\newcommand  {\todop}[1]   {\draft{\colorbox{dimbg}{#1}\hspace{-.5ex}}}
+\newcommand  {\todos}[2][] {\todo{{#1}\begin{itemize}{#2}\end{itemize}}}
+\newcommand  {\ignore}[1]  {}
+
+\newcommand{\fig}[3][] {
+  \begin{figure}
+    \ffigbox[\FBwidth]
+    {\includegraphics[#1]{data/#2}}
+    {\caption{\draft{\bf\tiny[#2] }#3}\label{fig:#2}}
+  \end{figure}
+}
+
+\newcommand{\twofig}[6][] {
+  \begin{figure}
+    \ffigbox[#1]
+    {
+      \subfloat[\draft{\bf\tiny[#2] }#3]{\label{fig:#2:a}\includegraphics{data/#2}}
+      \subfloat[\draft{\bf\tiny[#4] }#5]{\label{fig:#2:b}\includegraphics{data/#4}}
+    }
+    {\caption{#6}\label{fig:#2}}
+  \end{figure}
+}
+
+\pgfdeclarepatternformonly%
+{inside domain}
+{ % bounding box lower left
+  \pgfqpoint{-1pt}{-1pt}
+}{% bounding box upper right
+  \pgfqpoint{10pt}{10pt}
+}{% step vector (cell spacing)
+  \pgfqpoint{9pt}{9pt}
+}{% pattern code
+  \pgfsetlinewidth{0.4pt}
+  \pgfpathmoveto{\pgfqpoint{0pt}{0pt}}
+  \pgfpathlineto{\pgfqpoint{9.1pt}{9.1pt}}
+  \pgfusepath{stroke}
+}
+
+\newlength{\fracheight}
+\settoheight{\fracheight}{$\frac{T}{x}$}
+\newcommand{\fracspacer}{\rule[-\fracheight]{0pt}{0pt}}
+
+\newcommand{\version}{\today{} $\cdot$ \input{version}}
+\date{\today}
+
+\newcommand{\ptikz}[1]{\protect\tikz{\protect #1}}
+
+\newcommand{\BJ}{\ensuremath{\R{SJ}}}
+\newcommand{\GS}{\ensuremath{\R{GS}}}
+\newcommand{\SGS}{\ensuremath{\R{SGS}}}
+\newcommand{\cBJ}{\ensuremath{\R{CJ}}}
+\newcommand{\cSGS}{\ensuremath{\R{CSGS}}}
+\newcommand{\sBJ}{\ensuremath{\R{GJ($-1$)}}}
+\newcommand{\sGS}{\ensuremath{\R{GGS}}}
+\newcommand{\sSGS}{\ensuremath{\R{GSGS}}}
+\newcommand{\GJ}[1]{\ensuremath{\R{GJ($#1$)}}}
+\newcommand{\sSGScg}{\ensuremath{\R{GSGS/CG}}}
+
+\newsavebox{\mybox}
+\newlength{\myboxlen}
+\newcommand{\capbox}[3][-1ex]{
+  \sbox{\mybox}{#3}
+  \settowidth{\myboxlen}{\usebox{\mybox}}
+  \addtolength{\myboxlen}{#1}
+  \tabcap{\myboxlen}
+  \ifthenelse{\equal{#2}{}}%
+  {}%
+  {\caption{#2}}
+  \usebox{\mybox}
+}
