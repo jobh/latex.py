@@ -1,4 +1,4 @@
-\documentclass[final]{nagauth}
+\documentclass{nagauth}
 %\documentclass{nagauth}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -56,6 +56,7 @@
 \let\onabla\nabla	\renewcommand\nabla{\V{\onabla}}
 \newcommand\U{\V{u}}
 
+\newcommand\vD{\V{v}_\R{D}}
 
 \DeclareMathOperator{\diag}{diag}
 
@@ -64,6 +65,7 @@
 \newcommand {\refeqs}[2] {Equations~\eqref{eq:#1} and~\eqref{eq:#2}}
 \newcommand {\refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
 \newcommand {\Refeq}[1]  {Equation~\eqref{eq:#1}}
+\newcommand {\Refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
 \newcommand {\reffig}[1] {Figure~\ref{fig:#1}}
 \newcommand {\reffigs}[2]{Figures~\ref{fig:#1} and~\ref{fig:#2}}
 \newcommand {\Reffig}[1] {Figure~\ref{fig:#1}}
@@ -79,9 +81,9 @@
 
 \newcommand{\fig}[3][] {
   \begin{figure}
-    \ffigbox[\FBwidth]
+    %\ffigbox[\FBwidth]
     {\includegraphics[#1]{data/#2}}
-    {\caption{\draft{\bf\tiny[#2] }#3}\label{fig:#2}}
+    %{\caption{\draft{\bf\tiny[#2] }#3}\label{fig:#2}}
   \end{figure}
 }
 
