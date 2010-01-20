@@ -1,0 +1,221 @@
+%% -*- mode: LaTeX -*-
+\input{header}
+
+%@EXEC_ = r'%@ '
+%@PREFIX_ = '\\'
+
+%@ M  = r'\mathrm{%s}'
+%@ R  = r'\text{%s}'
+%@ X  = r'\M{%s}'
+%@ MM = r'\mathcal{%s}'
+%@ del = r'\partial'
+
+\begin{document}
+
+%\NAG{<first page>}{<last page>}{<volume>}{<issue>}{<yy>}
+\NAG{0}{0}{0}{0}{00}
+\runningheads{J.~B.~Haga \emph{et al.}}{Pressure oscillations in low-permeable porous media}
+\noreceived{}%\received{<date>}
+\norevised{}%\revised{<date>}
+\noaccepted{}%\accepted{<date>}
+
+\title{Pressure oscillations and locking in low-permeable and incompressible porous media}
+\author{
+  Joachim Berdal Haga\affil{1}\comma\affil{2}\comma\corrauth,
+  Harald Osnes\affil{1}\comma\affil{2} and
+  Hans Petter Langtangen\affil{1}\comma\affil{3}}
+\address{%
+\affilnum{1}\ Scientific Computing Department, Simula Research Laboratory, Norway\\
+\affilnum{2}\ Department of Mathematics, University of Oslo, Norway\\
+\affilnum{3}\ Department of Informatics, University of Oslo, Norway\\
+\todop{\version}
+}
+\corraddr{%
+J.~B.~Haga, Simula Research Laboratory, 
+PO Box 134, N-1325 Lysaker, Norway. E-mail: jobh@simula.no}
+%\footnotetext[2]{E-mail: jobh@simula.no}
+\cgs{Statoil ASA}
+\cgs{Norwegian Research Council}
+
+\begin{abstract}
+%
+Large-scale simulations of flow in deformable porous media require
+\end{abstract}
+\keywords{Biot's consolidation; pressure oscillations; elasticity locking; low-permeable media; 
+incompressible media; finite elements}
+
+\section*{Introduction}
+The locking phenomenon in elasticity is well known to cause spurious
+oscillations in the (solid) pressure and erroneous displacement solutions for
+nearly incompressible materials.
+A similar phenomenon can be seen in poroelasticity when low-permeable regions
+are present.
+In the latter case, oscillations can be observed in the fluid pressure. In
+[ref], Phillips et al.~argue that these phenomena come from the same
+fundamental problem: the reduction of effective degrees of freedom in the
+displacement solution when the finite elements are required to be (nearly)
+divergence-free, $\nabla \cdot \U\approx 0$.
+
+In the present paper, we test this hypothesis numerically by employing the
+mixed finite element formulation for the displacement fielt in the poroelastic
+equations.
+Furthermore, we look at ways to overcome the pressure oscillations in
+low-permeable materials without resorting to Discontinuous Galerkin methods
+(which have been shown ito alleviate the problem [ibid.]).
+
+\section{The mathematical model}
+
+The equations describing poroelastic flow and deformation can be derived from
+the principles of conservation of fluid mass and the balance of forces on the
+porous matrix.
+%
+The linear poroelastic equations can, in the small-strains regime, be
+expressed as
+%
+\begin{align}
+\label{eq:sim1}
+S\dot{p} - \nabla \cdot \Lambda \nabla p + \alpha \nabla \cdot \dot{\U} &= q, \\
+\label{eq:sim2}
+\nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
+ -  \alpha \nabla p &= \V{r}.
+\end{align}
+%
+Here, we subsume body forces such as gravitational forces into the right-hand
+side source terms $q$ and $\V{r}$.
+The primary variables are $p$ for the fluid pressure and $\U$ for the
+displacement of the porous medium, $S$ and $\Lambda$ are the fluid storage
+coefficient and the flow mobility respectively, $\alpha$ is the Biot-Willis fluid/solid
+coupling coefficient, and $\lambda$ and $\mu$ are the Lam\'e elastic parameters.
+
+The fluid flow rate, or Darcy velocity, is often of particular interest in
+poroelastic calculations.
+It can be written as
+\begin{equation}
+  \vD= -\Lambda \nabla p,
+\end{equation}
+but due to the differential operator acting on $p$ it is of lower accuracy than
+$p$ itself.
+A natural extension is to introduce $\vD$ as a primary variable in a mixed
+finite element formulation.
+\Refeqr{sim1}{sim2} then expand to a coupled problem of two vector variables and one scalar
+variable,
+\begin{align}
+\label{eq:simp1}
+S\dot{p} + \nabla \cdot \vD + \alpha \nabla \cdot \dot{\U} &= q, \\
+\label{eq:simp2}
+  \Lambda^{-1} \vD + \nabla p &= 0,\\
+\label{eq:simp3}
+\nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
+ -  \alpha \nabla p &= \V{r}.
+\end{align}
+An alternative way to write \refeq{simp3} is
+\begin{equation}
+\nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
+ +  \alpha \Lambda^{-1}\vD = \V{r},
+\end{equation}
+which [must be tested, and removed?] probably leads to numerical instability
+when $\Lambda\rightarrow 0$ and destroys the symmetry to boot.
+We shall call this the mixed fluid pressure, or mixed-$p$, formulation.
+
+In the field of (pure) elasticity, it is well understood that a
+low-compressible material (with Poisson's ratio close to $0.5$) leads to
+unphysical oscillations in the solid pressure field, and in some cases also to
+a wrong solution for the calculated displacement.
+This can be explained by $\lambda\rightarrow\infty$ in \refeq{sim2}, leading to
+the requirement that $\nabla\cdot\U\rightarrow 0$ --- a requirement that is too
+severe for common finite elements.
+One way to overcome this obstacle is to introduce a new primary variable for
+the solid pressure,
+\begin{equation}
+\label{eq:s}
+s = -\lambda \nabla \cdot \U,
+\end{equation}
+and rewrite \refeq{sim2} as
+\begin{align}
+\nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
+ - \nabla s - \alpha \nabla p &= \V{r},\\
+\lambda^{-1}s+\nabla\cdot\U &= 0,
+\end{align}
+leading to a system of equations that is stable for low-compressible or even
+incompressible materials.
+
+In [ref], Phillips et al.~argue that the cause of pressure oscillations in
+low-permeable media is the same: Consider \refeq{sim1}, discretised in time
+with time step $\Delta t$ and with $S=q=0$.
+Assume furthermore that we take one time step from a state with
+$\nabla\cdot\U=0$.
+Then,
+\begin{equation}
+  \nabla\cdot\U \approx \varepsilon \onabla^2 p,
+\end{equation}
+with $\varepsilon=\Delta t \Lambda / \alpha,$ which becomes very small for
+short time steps and low permeabilities.
+Again, we see the requirement for a divergence-free solution for the
+displacement $\U$.
+
+Assuming this the case, we can combine the mixed-$p$ and the mixed-$\U$
+approaches, and introduce the solid pressure into the equation for the fluid
+pressure, i.e., \refeqs{sim1}{simp1}.\footnote{As a practical issue, we note
+  that this destroys the symmetry of the equations, with consequences for the
+  choice of iterative solver for the discretised system.}
+This doubly mixed system of two vector variables and two scalar variables can be
+written as
+\begin{align}
+S\dot{p} + \nabla \cdot \vD + \alpha \lambda^{-1} \dot{s} &= q, \\
+\label{eq:mixp}
+  \Lambda^{-1} \vD + \nabla p &= 0,\\
+\nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
+ - \nabla s - \alpha \nabla p &= \V{r},\\
+\label{eq:mixu}
+\lambda^{-1}s+\nabla\cdot\U &= 0,
+\end{align}
+from which \refeq{mixp} and/or \refeq{mixu} may be eliminated, producing any of
+the mixed formulations above.
+
+\section{Losing the plot}
+
+The domain of the first test problem is shown in \reffig{domain}.
+Since we have not found any analytical solutions for the poroelastic equations
+with different material parameters, we use this test problems in two ways: If
+the load placed on the top boundary is uniform, it reduces to a one dimensional
+problem, with a straightforward analytical solution.
+Otherwise, we use the simple fact that the total equivalent volumetric stress,
+\begin{equation}
+\trace{\tilde{\sigma}} = s + \alpha p + 2\mu \nabla\cdot\U,
+\end{equation}
+should be continuous, smooth and monotonically non-increasing from top to bottom
+under simple loading conditions.
+This does not ensure that the numerical solution converges, but it is easy to
+identify both oscillatory solutions and also some plausible but wrong ones
+--- see, e.g., \reffig{asymm/Q0,RT1,Q1,-}b where each component field is smooth
+but the fluid pressure is too high / solid pressure is too low.
+For comparison, \reffig{asymm/Q0,RT1,Q1,Q0}b shows the correct (or at least
+apparently so) solution: the load is balanced initially (in the top layer) by
+solid pressure; then the fluid pressure takes over in the middle layer; and
+finally, in the bottom layer, a combination of fluid/solid pressure and
+volumetric strain.
+
+\fig{domain}{The test domain. On the sides and bottom, no-flux conditions are
+  imposed so that no fluid or solid movement is allowed in the normal
+  direction. The top is drained with fluid pressure $p=0$ and an applied normal
+  stress (load).}
+
+\fig[width=\textwidth]{symm/Q1,-,Q1,-}{Constant load}
+\fig[width=\textwidth]{symm/Q0,RT1,Q1,-}{Constant load, mixed-$p$}
+
+\fig[width=\textwidth]{asymm/Q1,-,Q1,-}{Asymmetric load}
+\fig[width=\textwidth]{asymm/Q0,RT1,Q1,-}{Asymmetric load, mixed-$p$}
+\fig[width=\textwidth]{asymm/Q1,-,Q1,Q0}{Asymmetric load, mixed-$\U$}
+\fig[width=\textwidth]{asymm/Q0,RT1,Q1,Q0}{Asymmetric load, mixed-both}
+
+\section*{Concluding remarks}
+
+
+
+\acks
+
+
+\bibliography{../references}
+\bibliographystyle{wileyj}
+
+\end{document}

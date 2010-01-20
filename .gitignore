@@ -1,0 +1,13 @@
+*~
+.auctex
+*.aux
+*.bbl
+*.blg
+*.log
+*.eps
+*.bak
+auto
+.published
+report.pdf
+version
+data/*.pdf

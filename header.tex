@@ -59,6 +59,7 @@
 \newcommand\vD{\V{v}_\R{D}}
 
 \DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\trace}{Tr}
 
 \newcommand {\refsec}[1] {\ERROR}
 \newcommand {\refeq}[1]  {Equation~\eqref{eq:#1}}
@@ -81,9 +82,9 @@
 
 \newcommand{\fig}[3][] {
   \begin{figure}
-    %\ffigbox[\FBwidth]
+    \ffigbox[\FBwidth]
     {\includegraphics[#1]{data/#2}}
-    %{\caption{\draft{\bf\tiny[#2] }#3}\label{fig:#2}}
+    {\caption{\draft{\bf\tiny[#2] }#3}\label{fig:#2}}
   \end{figure}
 }
 
