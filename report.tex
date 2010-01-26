@@ -40,8 +40,16 @@ PO Box 134, N-1325 Lysaker, Norway. E-mail: jobh@simula.no}
 \begin{abstract}
 %
 Large-scale simulations of flow in deformable porous media require
+
+We argue that pressure oscillations in low-permeable porous media should be
+understood as a failure to satisfy the inf-sup condition on the finite element
+spaces, rather than a failure to represent a nearly divergence-free
+displacement solution.
+This understanding makes it possible to use the established library of
+inf-sup-satisfying elements as a guideline for choosing finite element spaces
+for Biot's equations.
 \end{abstract}
-\keywords{Biot's consolidation; pressure oscillations; elasticity locking; low-permeable media; 
+\keywords{Biot's consolidation; pressure oscillations; elastic locking; low-permeable media; 
 incompressible media; finite elements}
 
 \section*{Introduction}
@@ -74,15 +82,15 @@ expressed as
 %
 \begin{align}
 \label{eq:sim1}
-S\dot{p} - \nabla \cdot \Lambda \nabla p + \alpha \nabla \cdot \dot{\U} &= q, \\
+S\dot{\Pf} - \nabla \cdot \Lambda \nabla \Pf + \alpha \nabla \cdot \dot{\U} &= q, \\
 \label{eq:sim2}
 \nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- -  \alpha \nabla p &= \V{r}.
+ -  \alpha \nabla \Pf &= \V{r}.
 \end{align}
 %
 Here, we subsume body forces such as gravitational forces into the right-hand
 side source terms $q$ and $\V{r}$.
-The primary variables are $p$ for the fluid pressure and $\U$ for the
+The primary variables are $\Pf$ for the fluid pressure and $\U$ for the
 displacement of the porous medium, $S$ and $\Lambda$ are the fluid storage
 coefficient and the flow mobility respectively, $\alpha$ is the Biot-Willis fluid/solid
 coupling coefficient, and $\lambda$ and $\mu$ are the Lam\'e elastic parameters.
@@ -91,22 +99,22 @@ The fluid flow rate, or Darcy velocity, is often of particular interest in
 poroelastic calculations.
 It can be written as
 \begin{equation}
-  \vD= -\Lambda \nabla p,
+  \vD= -\Lambda \nabla \Pf,
 \end{equation}
-but due to the differential operator acting on $p$ it is of lower accuracy than
-$p$ itself.
+but due to the differential operator acting on $\Pf$ it is of lower accuracy than
+$\Pf$ itself.
 A natural extension is to introduce $\vD$ as a primary variable in a mixed
 finite element formulation.
 \Refeqr{sim1}{sim2} then expand to a coupled problem of two vector variables and one scalar
 variable,
 \begin{align}
 \label{eq:simp1}
-S\dot{p} + \nabla \cdot \vD + \alpha \nabla \cdot \dot{\U} &= q, \\
+S\dot{\Pf} + \nabla \cdot \vD + \alpha \nabla \cdot \dot{\U} &= q, \\
 \label{eq:simp2}
-  \Lambda^{-1} \vD + \nabla p &= 0,\\
+  \Lambda^{-1} \vD + \nabla \Pf &= 0,\\
 \label{eq:simp3}
 \nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- -  \alpha \nabla p &= \V{r}.
+ -  \alpha \nabla \Pf &= \V{r}.
 \end{align}
 An alternative way to write \refeq{simp3} is
 \begin{equation}
@@ -115,7 +123,7 @@ An alternative way to write \refeq{simp3} is
 \end{equation}
 which [must be tested, and removed?] probably leads to numerical instability
 when $\Lambda\rightarrow 0$ and destroys the symmetry to boot.
-We shall call this the mixed fluid pressure, or mixed-$p$, formulation.
+We shall call this the mixed fluid pressure, or mixed-$\Pf$, formulation.
 
 In the field of (pure) elasticity, it is well understood that a
 low-compressible material (with Poisson's ratio close to $0.5$) leads to
@@ -128,13 +136,13 @@ One way to overcome this obstacle is to introduce a new primary variable for
 the solid pressure,
 \begin{equation}
 \label{eq:s}
-s = -\lambda \nabla \cdot \U,
+\Ps = -\lambda \nabla \cdot \U,
 \end{equation}
 and rewrite \refeq{sim2} as
 \begin{align}
 \nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- - \nabla s - \alpha \nabla p &= \V{r},\\
-\lambda^{-1}s+\nabla\cdot\U &= 0,
+ - \nabla \Ps - \alpha \nabla \Pf &= \V{r},\\
+\lambda^{-1}\Ps+\nabla\cdot\U &= 0,
 \end{align}
 leading to a system of equations that is stable for low-compressible or even
 incompressible materials.
@@ -146,14 +154,14 @@ Assume furthermore that we take one time step from a state with
 $\nabla\cdot\U=0$.
 Then,
 \begin{equation}
-  \nabla\cdot\U \approx \varepsilon \onabla^2 p,
+  \nabla\cdot\U \approx \varepsilon \onabla^2 \Pf,
 \end{equation}
 with $\varepsilon=\Delta t \Lambda / \alpha,$ which becomes very small for
 short time steps and low permeabilities.
 Again, we see the requirement for a divergence-free solution for the
 displacement $\U$.
 
-Assuming this the case, we can combine the mixed-$p$ and the mixed-$\U$
+Assuming this the case, we can combine the mixed-$\Pf$ and the mixed-$\U$
 approaches, and introduce the solid pressure into the equation for the fluid
 pressure, i.e., \refeqs{sim1}{simp1}.\footnote{As a practical issue, we note
   that this destroys the symmetry of the equations, with consequences for the
@@ -161,13 +169,13 @@ pressure, i.e., \refeqs{sim1}{simp1}.\footnote{As a practical issue, we note
 This doubly mixed system of two vector variables and two scalar variables can be
 written as
 \begin{align}
-S\dot{p} + \nabla \cdot \vD + \alpha \lambda^{-1} \dot{s} &= q, \\
+S\dot{\Pf} + \nabla \cdot \vD + \alpha \lambda^{-1} \dot{\Ps} &= q, \\
 \label{eq:mixp}
-  \Lambda^{-1} \vD + \nabla p &= 0,\\
+  \Lambda^{-1} \vD + \nabla \Pf &= 0,\\
 \nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- - \nabla s - \alpha \nabla p &= \V{r},\\
+ - \nabla \Ps - \alpha \nabla \Pf &= \V{r},\\
 \label{eq:mixu}
-\lambda^{-1}s+\nabla\cdot\U &= 0,
+\lambda^{-1}\Ps+\nabla\cdot\U &= 0,
 \end{align}
 from which \refeq{mixp} and/or \refeq{mixu} may be eliminated, producing any of
 the mixed formulations above.
@@ -181,13 +189,13 @@ the load placed on the top boundary is uniform, it reduces to a one dimensional
 problem, with a straightforward analytical solution.
 Otherwise, we use the simple fact that the total equivalent volumetric stress,
 \begin{equation}
-\trace{\tilde{\sigma}} = s + \alpha p + 2\mu \nabla\cdot\U,
+\trace{\tilde{\sigma}} = \Ps + \alpha \Pf + 2\mu \nabla\cdot\U,
 \end{equation}
 should be continuous, smooth and monotonically non-increasing from top to bottom
 under simple loading conditions.
 This does not ensure that the numerical solution converges, but it is easy to
 identify both oscillatory solutions and also some plausible but wrong ones
---- see, e.g., \reffig{asymm/Q0,RT1,Q1,-}b where each component field is smooth
+--- see, e.g., \reffig{asymm/Q0,RT1,Q1,-_all}b where each component field is smooth
 but the fluid pressure is too high / solid pressure is too low.
 For comparison, \reffig{asymm/Q0,RT1,Q1,Q0}b shows the correct (or at least
 apparently so) solution: the load is balanced initially (in the top layer) by
@@ -197,30 +205,30 @@ volumetric strain.
 
 \fig{domain}{The test domain. On the sides and bottom, no-flux conditions are
   imposed so that no fluid or solid movement is allowed in the normal
-  direction. The top is drained with fluid pressure $p=0$ and an applied normal
+  direction. The top is drained with fluid pressure $\Pf=0$ and an applied normal
   stress (load).}
 
-\fig[width=\textwidth]{symm/Q1,-,Q1,-}{Constant load}
-\fig[width=\textwidth]{symm/Q0,RT1,Q1,-}{Constant load, mixed-$p$}
+\fig[width=\textwidth]{symm/Q1,-,Q1,-_all}{Constant load}
+\fig[width=\textwidth]{symm/Q0,RT1,Q1,-_all}{Constant load, mixed-$\Pf$}
 
-\fig[width=\textwidth]{asymm/Q1,-,Q1,-}{Asymmetric load}
-\fig[width=\textwidth]{asymm/Q0,RT1,Q1,-}{Asymmetric load, mixed-$p$}
-\fig[width=\textwidth]{asymm/Q1,-,Q1,Q0}{Asymmetric load, mixed-$\U$}
-\fig[width=\textwidth]{asymm/Q0,RT1,Q1,Q0}{Asymmetric load, mixed-both}
+\fig[width=\textwidth]{asymm/Q1,-,Q1,-_all}{Asymmetric load}
+\fig[width=\textwidth]{asymm/Q0,RT1,Q1,-_all}{Asymmetric load, mixed-$\Pf$}
+\fig[width=\textwidth]{asymm/Q1,-,Q1,Q0_all}{Asymmetric load, mixed-$\U$}
+\fig[width=\textwidth]{asymm/Q0,RT1,Q1,Q0_all}{Asymmetric load, mixed-both}
 
 
 \section{Getting back on track}
 
-Elastic locking only appears with rotation, compare \reffig{symm/Q1,-,Q1,-}
-with \reffig{asymm/Q1,-,Q1,-}.
+Elastic locking only appears with rotation, compare \reffig{symm/Q1,-,Q1,-_all}
+with \reffig{asymm/Q1,-,Q1,-_all}.
 
-\fig[width=\textwidth]{symm/Q2,-,Q2,Q2}{}
+\fig[width=\textwidth]{symm/Q2,-,Q2,Q2_all}{}
 
 Without rotation, but with explicit violation of inf-sup,
-\reffig{symm/Q2,-,Q2,Q2}.
+\reffig{symm/Q2,-,Q2,Q2_all}.
 
-\fig[width=\textwidth]{symm/Q1,-,Q2,Q1-}{}
-\fig[width=\textwidth]{symm/Q1-,Q2,Q2,Q1-}{}
+\fig[width=\textwidth]{symm/Q1,-,Q2,Q1-_all}{}
+\fig[width=\textwidth]{symm/Q1-,Q2,Q2,Q1-_all}{}
 
 \section*{Concluding remarks}
 
