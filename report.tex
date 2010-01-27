@@ -52,7 +52,7 @@ for Biot's equations.
 \keywords{Biot's consolidation; pressure oscillations; elastic locking; low-permeable media; 
 incompressible media; finite elements}
 
-\section*{Introduction}
+\section{Introduction}
 The locking phenomenon in elasticity is well known to cause spurious
 oscillations in the (solid) pressure and erroneous displacement solutions for
 nearly incompressible materials.
@@ -151,7 +151,7 @@ $\V{\omega}$ in the domain $\Omega$:
   \int_\Omega [
   (\nabla\cdot\V{\omega})(\lambda+\mu)(\nabla\cdot\U)
   +\nabla \V{\omega} : \mu  \nabla \U
-  -(\nabla\cdot\V{\omega}) \Pf
+  -\alpha (\nabla\cdot\V{\omega}) \Pf
   ]  \D\Omega = - \int_\Omega \V{\omega} \cdot \V{r} \D\Omega + \int_\Gamma \V{\omega}
   \cdot \V{t}_{\V{n}} \D\Gamma.
 \end{gather}
@@ -161,7 +161,7 @@ $\Gamma$ appear here as natural boundary conditions.
 The discrete finite element approximation follows from solving
 \refeqs{weakpress}{weakdispl} in finite-dimensional spaces.
 
-\subsection*{Mixed fluid pressure-velocity formulation}
+\subsection{Mixed fluid pressure-velocity formulation}
 
 In many applications of the poroelastic equations, we are mainly interested in
 the flow of the fluid through the medium.
@@ -212,7 +212,7 @@ The integration by parts in \refeq{weakdarcy} is undertaken to avoid
 taking the derivative of $\Pf$, which is usually of low order (and possibly
 piecewise constant).
 
-\subsection*{Mixed solid displacement-pressure formulation}
+\subsection{Mixed solid displacement-pressure formulation}
 
 In the field of (pure) elasticity, it is well understood that a
 low-compressible material (with Poisson's ratio close to $0.5$) leads to
@@ -228,8 +228,10 @@ One way to overcome this obstacle is to introduce a new primary variable for
 the solid pressure, which is defined in \refeq{Ps}.
 \Refeq{sim2} can then be rewritten as two coupled equations,
 \begin{align}
+\label{eq:mixu1}
 \nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
  - \nabla \Ps - \alpha \nabla \Pf &= \V{r},\\
+\label{eq:mixu2}
 \lambda^{-1}\Ps+\nabla\cdot\U &= 0,
 \end{align}
 and combined with either \refeq{sim1} or with \refeqs{simp1}{simp2}.
@@ -239,7 +241,44 @@ sections.
 The mixed solid displacement, or mixed-$\U$, formulation is stable for
 low-compressible or even incompressible materials.
 
-\section{Hypo1}
+\subsubsection*{Weak discrete-in-time form.}
+
+The weak form of \refeqr{mixu1}{mixu2} is
+\begin{gather}
+  \label{eq:weakpress_mix2}
+  \int_\Omega [
+  S \pi \Pf
+  - \pi \lambda^{-1} \Ps
+  + \Delta t \nabla\pi \cdot \Lambda \nabla \Pf
+  ] \D\Omega 
+  = \int_\Omega [
+  \pi q \Delta t
+  + S \pi \prev{\Pf}
+  - \pi \lambda^{-1} \prev{\Ps}] \D\Omega
+-\int_\Gamma \pi f_{\V{n}}\Delta t \D\Gamma,\\
+%
+\label{eq:weakdispl_mix}
+  \int_\Omega [
+  (\nabla\cdot\V{\omega})\mu(\nabla\cdot\U)
+  +\nabla \V{\omega} : \mu  \nabla \U
+  -(\nabla\cdot\V{\omega})(\alpha \Pf + \Ps)
+  ]  \D\Omega = - \int_\Omega \V{\omega} \cdot \V{r} \D\Omega + \int_\Gamma \V{\omega}
+  \cdot \V{t}_{\V{n}} \D\Gamma,\\
+%
+\label{eq:weaks}
+  \int_\Omega [
+  \xi \lambda^{-1}\Ps + \xi\nabla \cdot \U 
+  ]  \D\Omega
+  = 0,
+\end{gather}
+for test functions $\pi$, $\V{\omega}$ and $\xi$ in the appropriate spaces.
+Finally, the trailing term on both sides of \refeq{weakpress_mix2} can be replaced in the
+same way as in \refeqr{weakpress_mix}{weakdarcy}, which produces a doubly-mixed
+coupled system of two vector unknowns and two scalar unknowns.
+
+\section{On the cause of pressure oscillations}
+
+\subsection{Hypo1}
 
 In [ref], Phillips et al.~argue that the cause of pressure oscillations in
 low-permeable media is the same: Consider \refeq{sim1}, discretised in time
@@ -326,7 +365,7 @@ Without rotation, but with intentional violation of inf-sup,
 
 Drop order of $\Pf$/$\Ps$, \reffig{symm/Q1,-,Q2,Q1-,EPS-14:both}.
 
-\section*{Concluding remarks}
+\section{Concluding remarks}
 
 
 
