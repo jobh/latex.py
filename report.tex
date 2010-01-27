@@ -43,10 +43,10 @@ Large-scale simulations of flow in deformable porous media require
 
 We argue that pressure oscillations in low-permeable porous media should be
 understood as a failure to satisfy the inf-sup condition on the finite element
-spaces, rather than a failure to represent a nearly divergence-free
-displacement solution.
+spaces, rather than as a failure to represent a nearly divergence-free
+displacement solution (locking).
 This understanding makes it possible to use the established library of
-inf-sup-satisfying elements as a guideline for choosing finite element spaces
+inf-sup-stable elements as a guideline for choosing finite element spaces
 for Biot's equations.
 \end{abstract}
 \keywords{Biot's consolidation; pressure oscillations; elastic locking; low-permeable media; 
@@ -95,57 +95,151 @@ displacement of the porous medium, $S$ and $\Lambda$ are the fluid storage
 coefficient and the flow mobility respectively, $\alpha$ is the Biot-Willis fluid/solid
 coupling coefficient, and $\lambda$ and $\mu$ are the Lam\'e elastic parameters.
 
-The fluid flow rate, or Darcy velocity, is often of particular interest in
-poroelastic calculations.
-It can be written as
+The fluid (Darcy) velocity is often of particular interest in poroelastic
+calculations.
+It can be written
 \begin{equation}
+  \label{eq:vD}
   \vD= -\Lambda \nabla \Pf,
 \end{equation}
-but due to the differential operator acting on $\Pf$ it is of lower accuracy than
-$\Pf$ itself.
-A natural extension is to introduce $\vD$ as a primary variable in a mixed
+and represents the net macroscopic flux.
+%
+For the displacement equation, the main secondary quantity of interest is the
+effective stress tensor,
+\begin{align}
+  \label{eq:sigma}
+  \tilde{\VV{\sigma}} &= (\alpha \Pf + \Ps) \VV{I} +
+  \mu\VV{(\nabla \U + \T{(\nabla \U)})},\\
+  \intertext{which is written here using the solid pressure}
+  \label{eq:Ps}
+  \Ps &= -\lambda \nabla \cdot \U.
+\end{align}
+
+\subsubsection*{Weak discrete-in-time form.}
+
+We employ a first-order backward finite difference method in time, which leads
+to the discrete-time form of \refeq{sim1}
+%
+\begin{equation}
+  \label{eq:time1}
+  S \Pf - \Delta t\nabla \cdot \Lambda \nabla \Pf
+  +  \nabla \cdot \U = q\Delta t + S \prev{\Pf} + \nabla \cdot \prev{\U}.
+\end{equation}
+%
+where $(\prev{\Pf},\prev{\U})$ use values from the previous time step,
+while unmarked variables are taken to be at the current time step.
+
+Next, we rewrite \refeqs{sim2}{time1} in
+weak form, using integration by parts to eliminate second derivatives.
+The following relations must then be satisfied for all test functions $\pi$ and
+$\V{\omega}$ in the domain $\Omega$:
+%
+\begin{gather}
+  \label{eq:weakpress}
+  \int_\Omega [
+  S \pi \Pf +
+    \Delta t \nabla\pi \cdot \Lambda \nabla \Pf
+  + \pi \nabla \cdot \U
+  ] \D\Omega 
+  = \int_\Omega [
+  \pi q \Delta t
+  + S \pi \prev{\Pf}
+  + \pi \nabla \cdot \prev{\U}] \D\Omega
+-\int_\Gamma \pi f_{\V{n}}\Delta t \D\Gamma,\\
+%
+\label{eq:weakdispl}
+  \int_\Omega [
+  (\nabla\cdot\V{\omega})(\lambda+\mu)(\nabla\cdot\U)
+  +\nabla \V{\omega} : \mu  \nabla \U
+  -(\nabla\cdot\V{\omega}) \Pf
+  ]  \D\Omega = - \int_\Omega \V{\omega} \cdot \V{r} \D\Omega + \int_\Gamma \V{\omega}
+  \cdot \V{t}_{\V{n}} \D\Gamma.
+\end{gather}
+%
+The normal flux $f_{\V{n}}=\vD\cdot\V n$ and normal stress $\V{t}_{\V{n}}$ on the boundary
+$\Gamma$ appear here as natural boundary conditions. 
+The discrete finite element approximation follows from solving
+\refeqs{weakpress}{weakdispl} in finite-dimensional spaces.
+
+\subsection*{Mixed fluid pressure-velocity formulation}
+
+In many applications of the poroelastic equations, we are mainly interested in
+the flow of the fluid through the medium.
+However, due to the differential operator acting on $\Pf$ it is of lower accuracy than
+the pressure $\Pf$ itself.
+Furthermore, the derivative is not continuous between elements, and hence the
+fluid mass is not conserved.
+A natural extension is then to introduce $\vD$ as an extra primary variable in a mixed
 finite element formulation.
-\Refeqr{sim1}{sim2} then expand to a coupled problem of two vector variables and one scalar
-variable,
+The order of accuracy is higher, and continuous elements for $\vD$ ensure mass
+conservation.
+
+By inserting \refeq{vD} into \refeq{sim1}, we get a coupled system of three
+equations (of which two are vector equations). \Refeq{sim2} for solid
+displacement is unchanged, and the equations for fluid flux and pressure are
 \begin{align}
 \label{eq:simp1}
 S\dot{\Pf} + \nabla \cdot \vD + \alpha \nabla \cdot \dot{\U} &= q, \\
 \label{eq:simp2}
-  \Lambda^{-1} \vD + \nabla \Pf &= 0,\\
-\label{eq:simp3}
-\nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- -  \alpha \nabla \Pf &= \V{r}.
+  \Lambda^{-1} \vD + \nabla \Pf &= 0.
 \end{align}
-An alternative way to write \refeq{simp3} is
-\begin{equation}
-\nabla (\lambda+\mu) \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- +  \alpha \Lambda^{-1}\vD = \V{r},
-\end{equation}
-which [must be tested, and removed?] probably leads to numerical instability
-when $\Lambda\rightarrow 0$ and destroys the symmetry to boot.
 We shall call this the mixed fluid pressure, or mixed-$\Pf$, formulation.
+
+\subsubsection*{Weak discrete-in-time form.}
+
+Following the same conventions as in the previous section, \refeq{weakpress}
+becomes the two coupled equations
+\begin{gather}
+  \label{eq:weakpress_mix}
+  \int_\Omega [
+  S \pi \Pf +
+  \Delta t \pi \nabla \cdot \vD
+  + \pi \nabla \cdot \U
+  ] \D\Omega 
+  = \int_\Omega [
+  \pi q \Delta t
+  + S \pi \prev{\Pf}
+  + \pi \nabla \cdot \prev{\U}] \D\Omega,\\
+%
+\label{eq:weakdarcy}
+  \int_\Omega [
+  \V{\phi} \cdot \Lambda^{-1}\vD - (\nabla \cdot \V{\phi})\Pf
+  ]  \D\Omega
+  + \int_\Gamma (\V{\phi}\cdot \V{n}) \Pf = 0,
+\end{gather}
+for any test functions $\pi$ and $\V{\phi}$ in the appropriate spaces.
+The integration by parts in \refeq{weakdarcy} is undertaken to avoid
+taking the derivative of $\Pf$, which is usually of low order (and possibly
+piecewise constant).
+
+\subsection*{Mixed solid displacement-pressure formulation}
 
 In the field of (pure) elasticity, it is well understood that a
 low-compressible material (with Poisson's ratio close to $0.5$) leads to
 unphysical oscillations in the solid pressure field, and in some cases also to
 a wrong solution for the calculated displacement.
-This can be explained by $\lambda\rightarrow\infty$ in \refeq{sim2}, leading to
-the requirement that $\nabla\cdot\U\rightarrow 0$ --- a requirement that is too
-severe for common finite elements.
+This can be explained by $\lambda$ becoming very large in \refeq{sim2}, leading to
+the requirement that $\nabla\cdot\U\rightarrow 0$.
+When this requirement is applied to standard finite elements, several degrees
+of freedom become ``locked'', leaving too few degrees of freedom to represent
+the correct solution.
+
 One way to overcome this obstacle is to introduce a new primary variable for
-the solid pressure,
-\begin{equation}
-\label{eq:s}
-\Ps = -\lambda \nabla \cdot \U,
-\end{equation}
-and rewrite \refeq{sim2} as
+the solid pressure, which is defined in \refeq{Ps}.
+\Refeq{sim2} can then be rewritten as two coupled equations,
 \begin{align}
 \nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
  - \nabla \Ps - \alpha \nabla \Pf &= \V{r},\\
 \lambda^{-1}\Ps+\nabla\cdot\U &= 0,
 \end{align}
-leading to a system of equations that is stable for low-compressible or even
-incompressible materials.
+and combined with either \refeq{sim1} or with \refeqs{simp1}{simp2}.
+In either case, we replace $\alpha \nabla \cdot \dot{\U}$ by $- \alpha
+\lambda^{-1} \dot{\Ps}$; the reason for this change will be elucidated in later
+sections.
+The mixed solid displacement, or mixed-$\U$, formulation is stable for
+low-compressible or even incompressible materials.
+
+\section{Hypo1}
 
 In [ref], Phillips et al.~argue that the cause of pressure oscillations in
 low-permeable media is the same: Consider \refeq{sim1}, discretised in time
@@ -208,8 +302,8 @@ volumetric strain.
   direction. The top is drained with fluid pressure $\Pf=0$ and an applied normal
   stress (load).}
 
-\fig[width=\textwidth]{symm/Q1,-,Q1,-,all}{Constant load}
-\fig[width=\textwidth]{symm/Q0,RT1,Q1,-,all}{Constant load, mixed-$\Pf$}
+\fig[width=\textwidth]{symm/Q1,-,Q1,-,all}{Uniform load}
+\fig[width=\textwidth]{symm/Q0,RT1,Q1,-,all}{Uniform load, mixed-$\Pf$}
 
 \fig[width=\textwidth]{asymm/Q1,-,Q1,-,all}{Asymmetric load}
 \fig[width=\textwidth]{asymm/Q0,RT1,Q1,-,all}{Asymmetric load, mixed-$\Pf$}
@@ -219,16 +313,18 @@ volumetric strain.
 
 \section{Getting back on track}
 
+\twofig{symm/Q1,-,Q1,-,EPS-14}{Uniform}{asymm/Q1,-,Q1,-,EPS-14}{Asymm}{Compare}
+
 Elastic locking only appears with rotation, compare \reffig{symm/Q1,-,Q1,-,all}
 with \reffig{asymm/Q1,-,Q1,-,all}.
 
-\fig[width=\textwidth]{symm/Q2,-,Q2,Q2,all}{}
+\twofig{symm/Q1,-,Q1,Q1,EPS-14}{$Q^1$}{symm/Q2,-,Q2,Q2,EPS-14}{$Q^2$}{Compare}
+\twofig{symm/Q1,-,Q2,Q1-,EPS-14}{Continuous $\Pf$}{symm/Q1-,Q2,Q2,Q1-,EPS-14}{Mixed-$\Pf$}{Compare}
 
-Without rotation, but with explicit violation of inf-sup,
-\reffig{symm/Q2,-,Q2,Q2,all}.
+Without rotation, but with intentional violation of inf-sup,
+\reffig{symm/Q1,-,Q1,Q1,EPS-14:both}.
 
-\fig[width=\textwidth]{symm/Q1,-,Q2,Q1-,all}{}
-\fig[width=\textwidth]{symm/Q1-,Q2,Q2,Q1-,all}{}
+Drop order of $\Pf$/$\Ps$, \reffig{symm/Q1,-,Q2,Q1-,EPS-14:both}.
 
 \section*{Concluding remarks}
 

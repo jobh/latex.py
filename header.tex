@@ -40,7 +40,7 @@
 
 \newcommand   {\R}[1]   {\text{#1}}       % (math) roman
 \newcommand   {\del}    {\partial}
-\newcommand   {\V}[1]   {\mathbf{#1}}            % vector
+\newcommand   {\V}[1]   {\boldsymbol{#1}}            % vector
 \newcommand   {\VV}[1]  {\mathrm{\bf #1}}           % tensor
 \newcommand   {\D}      {\,\mathrm{d}}
 
@@ -52,13 +52,15 @@
 \newcommand   {\T}[2][]   {#2^{\!\mathsf{#1T}}}
 \newcommand   {\norm}[1]{\lVert#1\rVert}
 
+\newcommand   {\prev}[1]{\hat{#1}}
+
 \let\oLambda\Lambda	\renewcommand\Lambda{\VV{\oLambda}}
 \let\onabla\nabla	\renewcommand\nabla{\V{\onabla}}
 
 \newcommand\U{\V{u}}
 \newcommand\vD{\V{v}_\R{D}}
-\newcommand\Pf{p}
-\newcommand\Ps{\pi}
+\newcommand\Pf{p_\R{f}}
+\newcommand\Ps{p_\R{s}}
 
 \DeclareMathOperator{\diag}{diag}
 \DeclareMathOperator{\trace}{Tr}
@@ -69,6 +71,7 @@
 \newcommand {\refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
 \newcommand {\Refeq}[1]  {Equation~\eqref{eq:#1}}
 \newcommand {\Refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
+\newcommand {\Refeqs}[2] {Equations~\eqref{eq:#1} and~\eqref{eq:#2}}
 \newcommand {\reffig}[1] {Figure~\ref{fig:#1}}
 \newcommand {\reffigs}[2]{Figures~\ref{fig:#1} and~\ref{fig:#2}}
 \newcommand {\Reffig}[1] {Figure~\ref{fig:#1}}
@@ -94,10 +97,10 @@
   \begin{figure}
     \ffigbox[#1]
     {
-      \subfloat[\draft{\bf\tiny[#2] }#3]{\label{fig:#2:a}\includegraphics{data/#2}}
-      \subfloat[\draft{\bf\tiny[#4] }#5]{\label{fig:#2:b}\includegraphics{data/#4}}
+      \subfloat[\draft{\bf\tiny[#2] }#3]{\label{fig:#2}\includegraphics[width=.45\textwidth]{data/#2}}
+      \subfloat[\draft{\bf\tiny[#4] }#5]{\label{fig:#4}\includegraphics[width=.45\textwidth]{data/#4}}
     }
-    {\caption{#6}\label{fig:#2}}
+    {\caption{#6}\label{fig:#2:both}}
   \end{figure}
 }
 
