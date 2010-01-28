@@ -137,22 +137,24 @@ $\V{\omega}$ in the domain $\Omega$:
 \begin{gather}
   \label{eq:weakpress}
   \int_\Omega [
-  S \pi \Pf +
-    \Delta t \nabla\pi \cdot \Lambda \nabla \Pf
-  + \pi \nabla \cdot \U
+    \pi(
+  S \Pf
+  + \nabla \cdot \U)
+  + \Delta t \nabla\pi \cdot \Lambda \nabla \Pf
   ] \D\Omega 
-  = \int_\Omega [
-  \pi q \Delta t
-  + S \pi \prev{\Pf}
-  + \pi \nabla \cdot \prev{\U}] \D\Omega
+  = \int_\Omega \pi[
+    q \Delta t
+  + S \prev{\Pf}
+  + \nabla \cdot \prev{\U}] \D\Omega
 -\int_\Gamma \pi f_{\V{n}}\Delta t \D\Gamma,\\
 %
 \label{eq:weakdispl}
   \int_\Omega [
-  (\nabla\cdot\V{\omega})(\lambda+\mu)(\nabla\cdot\U)
+  (\nabla\cdot\V{\omega})((\lambda+\mu)(\nabla\cdot\U)
+  -\alpha \Pf)
   +\nabla \V{\omega} : \mu  \nabla \U
-  -\alpha (\nabla\cdot\V{\omega}) \Pf
-  ]  \D\Omega = - \int_\Omega \V{\omega} \cdot \V{r} \D\Omega + \int_\Gamma \V{\omega}
+  ] \D\Omega =
+ - \int_\Omega \V{\omega} \cdot \V{r} \D\Omega + \int_\Gamma \V{\omega}
   \cdot \V{t}_{\V{n}} \D\Gamma.
 \end{gather}
 %
@@ -190,16 +192,16 @@ We shall call this the mixed fluid pressure, or mixed-$\Pf$, formulation.
 Following the same conventions as in the previous section, \refeq{weakpress}
 becomes the two coupled equations
 \begin{gather}
-  \label{eq:weakpress_mix}
-  \int_\Omega [
-  S \pi \Pf +
-  \Delta t \pi \nabla \cdot \vD
-  + \pi \nabla \cdot \U
+  \label{eq:weakpressmix}
+  \int_\Omega \pi[
+  S \Pf +
+  \Delta t \nabla \cdot \vD
+  + \nabla \cdot \U
   ] \D\Omega 
-  = \int_\Omega [
-  \pi q \Delta t
-  + S \pi \prev{\Pf}
-  + \pi \nabla \cdot \prev{\U}] \D\Omega,\\
+  = \int_\Omega \pi[
+  q \Delta t
+  + S \prev{\Pf}
+  + \nabla \cdot \prev{\U}] \D\Omega,\\
 %
 \label{eq:weakdarcy}
   \int_\Omega [
@@ -245,36 +247,36 @@ low-compressible or even incompressible materials.
 
 The weak form of \refeqr{mixu1}{mixu2} is
 \begin{gather}
-  \label{eq:weakpress_mix2}
-  \int_\Omega [
-  S \pi \Pf
-  - \pi \lambda^{-1} \Ps
+  \label{eq:weakpressmix2}
+  \int_\Omega [\pi(
+  S \Pf
+  - \lambda^{-1} \Ps)
   + \Delta t \nabla\pi \cdot \Lambda \nabla \Pf
   ] \D\Omega 
-  = \int_\Omega [
-  \pi q \Delta t
-  + S \pi \prev{\Pf}
-  - \pi \lambda^{-1} \prev{\Ps}] \D\Omega
+  = \int_\Omega \pi[
+   q \Delta t
+  + S \prev{\Pf}
+  - \lambda^{-1} \prev{\Ps}] \D\Omega
 -\int_\Gamma \pi f_{\V{n}}\Delta t \D\Gamma,\\
 %
-\label{eq:weakdispl_mix}
+\label{eq:weakdisplmix}
   \int_\Omega [
-  (\nabla\cdot\V{\omega})\mu(\nabla\cdot\U)
+  (\nabla\cdot\V{\omega})(\mu(\nabla\cdot\U)
+  -\alpha \Pf - \Ps)
   +\nabla \V{\omega} : \mu  \nabla \U
-  -(\nabla\cdot\V{\omega})(\alpha \Pf + \Ps)
   ]  \D\Omega = - \int_\Omega \V{\omega} \cdot \V{r} \D\Omega + \int_\Gamma \V{\omega}
   \cdot \V{t}_{\V{n}} \D\Gamma,\\
 %
 \label{eq:weaks}
-  \int_\Omega [
-  \xi \lambda^{-1}\Ps + \xi\nabla \cdot \U 
+  \int_\Omega \psi[
+     \lambda^{-1}\Ps + \nabla \cdot \U 
   ]  \D\Omega
   = 0,
 \end{gather}
-for test functions $\pi$, $\V{\omega}$ and $\xi$ in the appropriate spaces.
-Finally, the trailing term on both sides of \refeq{weakpress_mix2} can be replaced in the
-same way as in \refeqr{weakpress_mix}{weakdarcy}, which produces a doubly-mixed
-coupled system of two vector unknowns and two scalar unknowns.
+for test functions $\pi$, $\V{\omega}$ and $\psi$ in the appropriate spaces.
+Finally, the trailing term on both sides of \refeq{weakpressmix2} can be replaced in the
+same way as in \refeqr{weakpressmix}{weakdarcy} to produce a doubly mixed
+system of two vector unknowns and two scalar unknowns.
 
 \section{On the cause of pressure oscillations}
 
