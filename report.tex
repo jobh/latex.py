@@ -282,19 +282,44 @@ system of two vector unknowns and two scalar unknowns.
 
 \subsection{Hypo1}
 
-In [ref], Phillips et al.~argue that the cause of pressure oscillations in
-low-permeable media is the same: Consider \refeq{sim1}, discretised in time
-with time step $\Delta t$ and with $S=q=0$.
-Assume furthermore that we take one time step from a state with
-$\nabla\cdot\U=0$.
-Then,
+It is well known that spurious pressure oscillations may occur in low-permeable
+regions in finite element calculations of the poroelastic equations [ref].
+Phillips et al.~[ref] argue that the cause of these pressure oscillations 
+is caused by the phenomenon known as \emph{locking} in pure elasticity.
+Elastic locking appears when finite elements are asked to reproduce a
+displacement field that is nearly divergence free, as
+$\lambda\rightarrow\infty$ in \refeq{sim2} leads to $\nabla\cdot\U\rightarrow 0$.
+Satisfying this with standard finite elements locks out many of the degrees of
+freedom, in some cases to the extent that only (nearly) constant displacement
+fields can be represented.
+More commonly, the error in displacement is seen as nonphysical oscillations in
+the stress field (i.e., the components of $\nabla\U$).
+
+The argument by Phillips et al.~[] is that the same happens in poroelasticity,
+in some conditions.
+Consider \refeq{sim1} with constant permeability, discretised in time with time
+step $\Delta t$ and with $S=q=0$.
+Assume furthermore that we take one time step from a divergence-free initial
+state, which is quite normal at the start of a simulation ($\U=0$).
+Then, \refeq{sim1} reduces to
 \begin{equation}
-  \nabla\cdot\U \approx \varepsilon \onabla^2 \Pf,
+  \nabla\cdot\U \approx \epsilon \onabla^2 \Pf,
 \end{equation}
-with $\varepsilon=\Delta t \Lambda / \alpha,$ which becomes very small for
-short time steps and low permeabilities.
-Again, we see the requirement for a divergence-free solution for the
-displacement $\U$.
+with $\varepsilon=\Delta t \Lambda / \alpha$.
+The right-hand side becomes very small for short time steps and low permeabilities.
+Again, we see the appearance of the requirement for a nearly divergence-free
+solution for the displacement $\U$.
+
+There are, however, some differences.
+We illustrate these through an example where both problems are present: A
+low-permeable region ($\Lambda\rightarrow 0$) and a low-compressible region
+($\lambda\rightarrow\infty$).
+This example is shown in \reffig{domain}, parameterised by $\epsilon<1$.
+The top layer is low-compressible, with $\lambda=\epsilon^{-1}$; the middle
+layer is low-permeable, with $\Lambda=\epsilon\VV{I}$; while the bottom layer
+has unit permeability and compressibility.
+
+------------------
 
 Assuming this the case, we can combine the mixed-$\Pf$ and the mixed-$\U$
 approaches, and introduce the solid pressure into the equation for the fluid

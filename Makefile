@@ -1,7 +1,7 @@
-PDFGRAPHS := $(subst .gp,.pdf,$(wildcard data/*.gp data/*/*.gp)) $(subst .tex,.pdf,$(wildcard data/*.tex))
+PDFGRAPHS := $(patsubst %.gp,%.pdf,$(wildcard data/*.gp data/*/*.gp)) $(patsubst %.tex,%.pdf,$(wildcard data/*.tex))
 GRAPHS   := $(PDFGRAPHS) $(wildcard data/*.png)
-PSGRAPHS := $(subst .pdf,.eps,$(PDFGRAPHS)) $(subst .png,.eps,$(wildcard data/*.png))
-ALLFILES := $(shell git ls-files)
+PSGRAPHS := $(patsubst %.eps,%.eps,$(PDFGRAPHS)) $(patsubst %.png,%.eps,$(wildcard data/*.png))
+ALLFILES := $(shell git ls-files | grep -v ^data/raw)
 
 report.pdf: report.tex header.tex $(GRAPHS) version
 	pdflatex -interaction nonstopmode report.tex
