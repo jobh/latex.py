@@ -1,4 +1,4 @@
-PDFGRAPHS := $(subst .gp,.pdf,$(wildcard data/*.gp)) $(subst .tex,.pdf,$(wildcard data/*.tex))
+PDFGRAPHS := $(subst .gp,.pdf,$(wildcard data/*.gp data/*/*.gp)) $(subst .tex,.pdf,$(wildcard data/*.tex))
 GRAPHS   := $(PDFGRAPHS) $(wildcard data/*.png)
 PSGRAPHS := $(subst .pdf,.eps,$(PDFGRAPHS)) $(subst .png,.eps,$(wildcard data/*.png))
 ALLFILES := $(shell git ls-files)
@@ -21,7 +21,7 @@ data/iter-%.gp: data/iter-template.gpt
 	(n=$@; n=$${n#data/iter-}; n=$${n%.gp}; \
 	sed -e "s/XX/$$n/g" data/iter-template.gpt > $@)
 
-data/%.pdf: data/%.gp data/gptoeps data/common.gpi
+%.pdf: %.gp data/gptoeps
 	data/gptoeps $<
 	epstopdf --outfile $@.tmp $(subst .gp,.eps,$<)
 	pdfcrop $@.tmp $@
@@ -59,10 +59,10 @@ diff.pdf: report.tex $(GRAPHS) $(wildcard .git/refs/tags/$(REV)) version
 viewdiff: diff.pdf
 	evince diff.pdf 2>/dev/null
 
-data/%.eps: data/%.pdf
+%.eps: %.pdf
 	pdftops -eps $< $@
 
-data/%.eps: data/%.png
+%.eps: %.png
 	convert $< $@
 
 report.ps: report.dvi
