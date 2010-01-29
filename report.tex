@@ -1,14 +1,12 @@
-%% -*- mode: LaTeX -*-
-\input{header}
-
-%@EXEC_ = r'%@ '
+%@OUTPUT_ = False
+%@VERBOSE_ = 0
+%@ABORT_ = False
 %@PREFIX_ = '\\'
 
-%@ M  = r'\mathrm{%s}'
-%@ R  = r'\text{%s}'
-%@ X  = r'\M{%s}'
-%@ MM = r'\mathcal{%s}'
-%@ del = r'\partial'
+%@def fig(name, text, opt=None): print name
+%@def twofig(n1, t1, n2, t2, text, opt=None): print n1+"\n"+n2
+
+\input{header}
 
 \begin{document}
 
@@ -404,15 +402,16 @@ convergence of some of these elements.
 [Again, just the outline of the arguments.]
 
 \begin{itemize}
-\item Violating inf-sup on purpose shows similar oscillations in the
-  low-compressible region. [Weak argument, I know, but still...]. This is in
+\item Intentional violation of the inf-sup condition for $\U$-$\Ps$ shows similar oscillations in the
+  low-compressible region. [Argument from superficially similar symptoms is a
+  weak one, I know, but still...]. This happens even in
   the absence of rotation, where ``normal'' displacement locking does not
   occur. See \reffig{symm/Q2,-,Q2,-,EPS-14:symm/Q2,-,Q2,Q2,EPS-14}.
 \item Lowering the order of $\Pf$ and $\Ps$ removes oscillations in both
-  layers. This is consistent with this hypothesis, but not with the locking
+  layers. This is consistent with the current hypothesis, but not with the locking
   hypothesis, since we do not introduce more degrees of freedom in $\U$. See
   \reffig{symm/Q1,-,Q2,Q1-,EPS-14:symm/Q1-,Q2,Q2,Q1-,EPS-14}.
-\item This hypothesis (if correct) is good news, since the Discontinuous
+\item The present hypothesis (if correct) is good news, since the Discontinuous
   Galerkin method used by Phillips et al.~is computationally expensive. We can use first order
   Rannacher-Turek or Crouzeix-Raviart for displacement in combination with
   Raviart-Thomas for fluid velocity and piecewise constant pressure, or linear
@@ -434,6 +433,31 @@ the spikes there.}
   element spaces on the Barry-Mercer problem. Need to make a list of relevant
   elements.]
 
+The Barry-Mercer problem, analysed in [ref], is illustrated in [todo figure ?].
+It consists of a pulsating pressure point source within a square
+two-dimensional domain of constant material parameters.
+The boundary conditions are chosen to allow an analytical solution:
+\begin{align*}
+  \Pf &= 0, \\
+  \U \times \V{n} &= 0\\
+\intertext{at the sides, and the point source located at $\V{x}_0$ is given as}
+q(\V{x},t) &= p_0 \delta(\V{x}-\V{x}_0) \sin t.
+\end{align*}
+
+It has been demonstrated [ref] that the Barry-Mercer problem exhibits pressure
+oscillations for early times when $\epsilon=\norm{\Lambda} \Delta t \ll 1$.
+To see this, we look at the first time step on the unit square, with $\Delta
+t=10^{-2}$, $\Lambda=10^{-14}\VV{I}$, $p_0=1$ and $\V{x}_0=(0.25,0.25)$.
+This combination of parameters induces severe oscillations in the numerical
+solution when the mixed-$\Pf$ formulation with first order Raviart-Thomas
+elements is used for the fluid and bilinear elements are used for the displacement.
+\Reffig{barry-mercer/Q0,RT1,Q1,-,EPS-14:barry-mercer/Q0,RT1,CR1,-,EPS-14} shows
+how a minor change, switching the $\U$ finite element from conforming bilinear
+to nonconforming bilinear (Rannacher-Turek elements) removes the pressure
+oscillations.
+
+\twofig{barry-mercer/Q0,RT1,Q1,-,EPS-14}{a}{barry-mercer/Q0,RT1,CR1,-,EPS-14}{b}{}
+
 \section{Concluding remarks}
 
 
@@ -445,3 +469,9 @@ the spikes there.}
 \bibliographystyle{wileyj}
 
 \end{document}
+
+
+%% Local Variables:
+%% mode: LaTeX
+%% End:
+
