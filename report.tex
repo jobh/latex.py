@@ -5,6 +5,7 @@
 
 %@def fig(name, text, opt=None): print name
 %@def twofig(n1, t1, n2, t2, text, opt=None): print n1+"\n"+n2
+%@def includegraphics(name, opt=None): print name
 
 \input{header}
 
@@ -298,12 +299,12 @@ in some conditions.
 Consider \refeq{sim1} with constant permeability, discretised in time with time
 step $\Delta t$ and with $S=q=0$.
 Assume furthermore that we take one time step from a divergence-free initial
-state, which is quite normal at the start of a simulation ($\U=0$).
+state, which is quite normal at the start of a simulation (when $\U=0$).
 Then, \refeq{sim1} reduces to
 \begin{equation}
   \nabla\cdot\U \approx \epsilon \onabla^2 \Pf,
 \end{equation}
-with $\varepsilon=\Delta t \Lambda / \alpha$.
+with $\epsilon=\Delta t \norm{\Lambda} / \alpha$.
 The right-hand side becomes very small for short time steps and low permeabilities.
 Again, we see the appearance of the requirement for a nearly divergence-free
 solution for the displacement $\U$.
@@ -338,18 +339,15 @@ effective stress,
 \frac{\trace{\tilde{\sigma}}}{3} = \Ps + \alpha \Pf + 2\mu \nabla\cdot\U,
 \end{equation}
 should be continuous, smooth and monotonically non-increasing from top to bottom
-under simple loading conditions. (The correct solutions are shown in
+under simple loading conditions. The correct solutions are shown in
 \reffig{symm/Q0,RT1,Q1,-} for constant load and \reffig{asymm/Q0,RT1,CR1,Q0} for
-non-constant load.)
+non-constant load.
 This does \emph{not} ensure that the numerical solution converges, but it is easy to
 identify oscillatory solutions.
-The correct solutions are shown in
-\reffig{symm/Q0,RT1,Q1,-} for constant load and \reffig{asymm/Q0,RT1,Q1,Q0} for
-non-constant load.
 For small $\epsilon$, the load is balanced initially (in the top layer) by
 solid pressure; then the fluid pressure takes over in the middle layer; and
 finally, in the bottom layer, a combination of fluid/solid pressure and
-volumetric strain.
+volumetric strain takes the load.
 
 \fig[width=\textwidth]{symm/Q0,RT1,Q1,-}{Correct solution for the constant-load
 problem. From left to right: $\epsilon=10^{-1}$, $\epsilon=10^{-4}$, $\epsilon=10^{-14}$.}
@@ -364,11 +362,11 @@ problem. From left to right: $\epsilon=10^{-1}$, $\epsilon=10^{-4}$, $\epsilon=1
 \item If elastic locking is the cause of pressure oscillations, it should be
   cured by the mixed-$\U$ formulation. But mixed-$\U$ only removes the
   oscillations in the top (incompressible) layer, not in the middle
-  (impermeable) layer. See \reffig{asymm/P2,-,P2,-,EPS-14:asymm/P2,-,P2+,P1-}. This is
+  (impermeable) layer. See \reffig{asymm/P2,-,P2,-,EPS-14:asymm/P2,-,P2+,P1-,EPS-14}. This is
   probably the most powerful argument.
-\item The impermeable layer does \emph{not} force $\U$ to be constant. The
-  incompressible layer does. See \reffig{u-locking}. Hence, locking is not
-  present in the impermeable layer.
+\item The impermeable layer does \emph{not} force $\U$ towards a constant. The
+  incompressible layer does. See \reffig{u-locking}. Hence, locking is present
+  in the incompressible but not in the impermeable layer.
 \end{itemize}
 
 \twofig{symm/Q1,-,Q1,-,EPS-14}{Constant load}{asymm/Q1,-,Q1,-,EPS-14}{Variable
@@ -391,15 +389,15 @@ This is inspired by the similar roles that $\Pf$ and $\Ps$ play in relation to $
 in \refeqs{mixu1}{mixu2} and \eqref{eq:sim1}.
 It is well known that only combinations of element spaces that satisfy the
 inf-sup condition are stable for the $\U$-$\Ps$ system.
-We shall present evidence showing the similarity that the symptoms of violating
-the condition has with the pressure oscillations.
+We shall present experimental evidence showing that the fluid pressure
+oscillations are similar to the solid pressure oscillations that occur when the
+inf-sup condition is violated.
 Furthermore, we will show that using combinations of elements that are known to
-be stable for Poisson and Stokes type problems, we can get rid of the
-oscillations.
-We will continue in the following section, where we show the numerical
+be stable for Poisson and Stokes type problems, the oscillations disappear.
+This continues in the following section, where we show the
 convergence of some of these elements.
 
-[Again, just the outline of the arguments.]
+[Again, I just the outline of the arguments.]
 
 \begin{itemize}
 \item Intentional violation of the inf-sup condition for $\U$-$\Ps$ shows similar oscillations in the

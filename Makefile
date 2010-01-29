@@ -1,9 +1,8 @@
-PDFGRAPHS := $(patsubst %.gp,%.pdf,$(wildcard data/*.gp data/*/*.gp)) $(patsubst %.tex,%.pdf,$(wildcard data/*.tex))
-GRAPHS   := $(PDFGRAPHS) $(wildcard data/*.png)
-PSGRAPHS := $(patsubst %.eps,%.eps,$(PDFGRAPHS)) $(patsubst %.png,%.eps,$(wildcard data/*.png))
+PDFGRAPHS := $(patsubst %,data/%.pdf,$(shell python ./parse.py report.tex))
+PSGRAPHS := $(patsubst %.pdf,%.eps,$(PDFGRAPHS))
 ALLFILES := $(shell git ls-files | grep -v ^data/raw)
 
-report.pdf: report.tex header.tex $(GRAPHS) version
+report.pdf: report.tex header.tex $(PDFGRAPHS) version
 	pdflatex -interaction nonstopmode report.tex
 
 view: report.pdf
@@ -21,8 +20,10 @@ data/iter-%.gp: data/iter-template.gpt
 	(n=$@; n=$${n#data/iter-}; n=$${n%.gp}; \
 	sed -e "s/XX/$$n/g" data/iter-template.gpt > $@)
 
-%.pdf: %.gp data/gptoeps
-	data/gptoeps $<
+%.gp: data/gptoeps
+	data/gptoeps $@
+
+%.pdf: %.gp
 	epstopdf --outfile $@.tmp $(subst .gp,.eps,$<)
 	pdfcrop $@.tmp $@
 	rm -f $@.tmp
