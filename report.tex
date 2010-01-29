@@ -280,7 +280,7 @@ system of two vector unknowns and two scalar unknowns.
 
 \section{On the cause of pressure oscillations}
 
-\subsection{Hypo1}
+\subsection{Is it caused by locking?}
 
 It is well known that spurious pressure oscillations may occur in low-permeable
 regions in finite element calculations of the poroelastic equations [ref].
@@ -311,86 +311,128 @@ Again, we see the appearance of the requirement for a nearly divergence-free
 solution for the displacement $\U$.
 
 There are, however, some differences.
-We illustrate these through an example where both problems are present: A
+We illustrate these through an example where both kinds of problem are present: A
 low-permeable region ($\Lambda\rightarrow 0$) and a low-compressible region
 ($\lambda\rightarrow\infty$).
-This example is shown in \reffig{domain}, parameterised by $\epsilon<1$.
-The top layer is low-compressible, with $\lambda=\epsilon^{-1}$; the middle
+This example is shown in \reffig{domain}.
+The top layer is low-compressible, with $\lambda=\epsilon^{-1}$ for some $\epsilon<1$; the middle
 layer is low-permeable, with $\Lambda=\epsilon\VV{I}$; while the bottom layer
 has unit permeability and compressibility.
-
-------------------
-
-Assuming this the case, we can combine the mixed-$\Pf$ and the mixed-$\U$
-approaches, and introduce the solid pressure into the equation for the fluid
-pressure, i.e., \refeqs{sim1}{simp1}.\footnote{As a practical issue, we note
-  that this destroys the symmetry of the equations, with consequences for the
-  choice of iterative solver for the discretised system.}
-This doubly mixed system of two vector variables and two scalar variables can be
-written as
-\begin{align}
-S\dot{\Pf} + \nabla \cdot \vD + \alpha \lambda^{-1} \dot{\Ps} &= q, \\
-\label{eq:mixp}
-  \Lambda^{-1} \vD + \nabla \Pf &= 0,\\
-\nabla \mu \nabla \cdot \U + \nabla \cdot \mu \nabla \U
- - \nabla \Ps - \alpha \nabla \Pf &= \V{r},\\
-\label{eq:mixu}
-\lambda^{-1}\Ps+\nabla\cdot\U &= 0,
-\end{align}
-from which \refeq{mixp} and/or \refeq{mixu} may be eliminated, producing any of
-the mixed formulations above.
-
-\section{Losing the plot}
-
-The domain of the first test problem is shown in \reffig{domain}.
-Since we have not found any analytical solutions for the poroelastic equations
-with different material parameters, we use this test problems in two ways: If
-the load placed on the top boundary is uniform, it reduces to a one dimensional
-problem, with a straightforward analytical solution.
-Otherwise, we use the simple fact that the total equivalent volumetric stress,
-\begin{equation}
-\trace{\tilde{\sigma}} = \Ps + \alpha \Pf + 2\mu \nabla\cdot\U,
-\end{equation}
-should be continuous, smooth and monotonically non-increasing from top to bottom
-under simple loading conditions.
-This does not ensure that the numerical solution converges, but it is easy to
-identify both oscillatory solutions and also some plausible but wrong ones
---- see, e.g., \reffig{asymm/Q0,RT1,Q1,-}b where each component field is smooth
-but the fluid pressure is too high / solid pressure is too low.
-For comparison, \reffig{asymm/Q0,RT1,Q1,Q0}b shows the correct (or at least
-apparently so) solution: the load is balanced initially (in the top layer) by
-solid pressure; then the fluid pressure takes over in the middle layer; and
-finally, in the bottom layer, a combination of fluid/solid pressure and
-volumetric strain.
+The boundary conditions at the sides and bottom are
+\begin{align*}
+  \U\cdot\V{n}&=0,\\
+  \V{f}_{\V{n}}&=0,\\
+\intertext{while the top boundary has boundary conditions}
+\Pf&=0,\\
+\V{t}_{\V{n}}&=F.
+\end{align*}
 
 \fig{domain}{The test domain. On the sides and bottom, no-flux conditions are
   imposed so that no fluid or solid movement is allowed in the normal
   direction. The top is drained with fluid pressure $\Pf=0$ and an applied normal
   stress (load).}
 
-\fig[width=\textwidth]{symm/Q1,-,Q1,-}{Uniform load}
-\fig[width=\textwidth]{symm/Q0,RT1,Q1,-}{Uniform load, mixed-$\Pf$}
+We use this test problems with two different choices of load $F$: Constant load
+across the whole boundary, and load on just the right half.
+To evaluate the numerical solutions, we use the fact that the total volumetric
+effective stress,
+\begin{equation}
+\frac{\trace{\tilde{\sigma}}}{3} = \Ps + \alpha \Pf + 2\mu \nabla\cdot\U,
+\end{equation}
+should be continuous, smooth and monotonically non-increasing from top to bottom
+under simple loading conditions. (The correct solutions are shown in
+\reffig{symm/Q0,RT1,Q1,-} for constant load and \reffig{asymm/Q0,RT1,CR1,Q0} for
+non-constant load.)
+This does \emph{not} ensure that the numerical solution converges, but it is easy to
+identify oscillatory solutions.
+The correct solutions are shown in
+\reffig{symm/Q0,RT1,Q1,-} for constant load and \reffig{asymm/Q0,RT1,Q1,Q0} for
+non-constant load.
+For small $\epsilon$, the load is balanced initially (in the top layer) by
+solid pressure; then the fluid pressure takes over in the middle layer; and
+finally, in the bottom layer, a combination of fluid/solid pressure and
+volumetric strain.
 
-\fig[width=\textwidth]{asymm/Q1,-,Q1,-}{Asymmetric load}
-\fig[width=\textwidth]{asymm/Q0,RT1,Q1,-}{Asymmetric load, mixed-$\Pf$}
-\fig[width=\textwidth]{asymm/Q1,-,Q1,Q0}{Asymmetric load, mixed-$\U$}
-\fig[width=\textwidth]{asymm/Q0,RT1,Q1,Q0}{Asymmetric load, mixed-both}
+\fig[width=\textwidth]{symm/Q0,RT1,Q1,-}{Correct solution for the constant-load
+problem. From left to right: $\epsilon=10^{-1}$, $\epsilon=10^{-4}$, $\epsilon=10^{-14}$.}
+\fig[width=\textwidth]{asymm/Q0,RT1,CR1,Q0}{Correct solution for the variable-load
+problem. From left to right: $\epsilon=10^{-1}$, $\epsilon=10^{-4}$, $\epsilon=10^{-14}$.}
+
+[The following is an outline of the argument / evidence. To be filled in with prose.]
+\begin{itemize}
+\item Elastic locking appears when there is rotation [ref for this?]. Pressure oscillations
+  occurs even in the absence of rotation. See
+  \reffig{symm/Q1,-,Q1,-,EPS-14:asymm/Q1,-,Q1,-,EPS-14}.
+\item If elastic locking is the cause of pressure oscillations, it should be
+  cured by the mixed-$\U$ formulation. But mixed-$\U$ only removes the
+  oscillations in the top (incompressible) layer, not in the middle
+  (impermeable) layer. See \reffig{asymm/P2,-,P2,-,EPS-14:asymm/P2,-,P2+,P1-}. This is
+  probably the most powerful argument.
+\item The impermeable layer does \emph{not} force $\U$ to be constant. The
+  incompressible layer does. See \reffig{u-locking}. Hence, locking is not
+  present in the impermeable layer.
+\end{itemize}
+
+\twofig{symm/Q1,-,Q1,-,EPS-14}{Constant load}{asymm/Q1,-,Q1,-,EPS-14}{Variable
+  load}{Pressure oscillations even with constant load. $\epsilon=10^{-14}$}
+\twofig{asymm/P2,-,P2,-,EPS-14}{Not
+  mixed}{asymm/P2,-,P2+,P1-,EPS-14}{Mixed-$\U$}{Mixed displacement only
+  effective for incompressible region. $\epsilon=10^{-14}$}
+\fig[width=0.5\textwidth]{u-locking}{Locking in $\U_z$ (red) vs.~non-locking
+  (green). Notice the nearly constant displacement in the top layer. $\epsilon=10^{-14}$}
+
+The evidence points to pressure oscillations not being caused by locking due to
+divergence-free $\U$.
+
+\section{Is it caused by incompatible finite element spaces (in the inf-sup sense)?}
+
+We introduce here the hypothesis that the pressure oscillations are caused by a
+failure of the finite element spaces in the coupled system to fulfill the
+Babuska-Brezzi [ref] inf-sup condition.
+This is inspired by the similar roles that $\Pf$ and $\Ps$ play in relation to $\U$
+in \refeqs{mixu1}{mixu2} and \eqref{eq:sim1}.
+It is well known that only combinations of element spaces that satisfy the
+inf-sup condition are stable for the $\U$-$\Ps$ system.
+We shall present evidence showing the similarity that the symptoms of violating
+the condition has with the pressure oscillations.
+Furthermore, we will show that using combinations of elements that are known to
+be stable for Poisson and Stokes type problems, we can get rid of the
+oscillations.
+We will continue in the following section, where we show the numerical
+convergence of some of these elements.
+
+[Again, just the outline of the arguments.]
+
+\begin{itemize}
+\item Violating inf-sup on purpose shows similar oscillations in the
+  low-compressible region. [Weak argument, I know, but still...]. This is in
+  the absence of rotation, where ``normal'' displacement locking does not
+  occur. See \reffig{symm/Q2,-,Q2,-,EPS-14:symm/Q2,-,Q2,Q2,EPS-14}.
+\item Lowering the order of $\Pf$ and $\Ps$ removes oscillations in both
+  layers. This is consistent with this hypothesis, but not with the locking
+  hypothesis, since we do not introduce more degrees of freedom in $\U$. See
+  \reffig{symm/Q1,-,Q2,Q1-,EPS-14:symm/Q1-,Q2,Q2,Q1-,EPS-14}.
+\item This hypothesis (if correct) is good news, since the Discontinuous
+  Galerkin method used by Phillips et al.~is computationally expensive. We can use first order
+  Rannacher-Turek or Crouzeix-Raviart for displacement in combination with
+  Raviart-Thomas for fluid velocity and piecewise constant pressure, or linear
+  pressure with enriched (bubble) linear elements for displacement.
+\end{itemize}
+
+\twofig{symm/Q2,-,Q2,-,EPS-14}{Non-mixed}{symm/Q2,-,Q2,Q2,EPS-14}{Mixed-$\U$, with
+  intentional inf-sup violation for $\U$-$\Ps$}{}
+\twofig{symm/Q1,-,Q2,Q1-,EPS-14}{Mixed-$\U$}{symm/Q1-,Q2,Q2,Q1-,EPS-14}{Mixed-both}{Apparently
+  correct solutions. When we introduce the mixed formulation also for the fluid
+pressure/velocity, we can use discontinuous elements for $\Pf$. These can better
+approximate the very steep gradients at the layer interfaces, and thus avoid
+the spikes there.}
 
 
-\section{Getting back on track}
+\section{Convergence testing}
 
-\twofig{symm/Q1,-,Q1,-,EPS-14}{Uniform}{asymm/Q1,-,Q1,-,EPS-14}{Asymm}{Compare}
-
-Elastic locking only appears with rotation, compare \reffig{symm/Q1,-,Q1,-}
-with \reffig{asymm/Q1,-,Q1,-}.
-
-\twofig{symm/Q1,-,Q1,Q1,EPS-14}{$Q^1$}{symm/Q2,-,Q2,Q2,EPS-14}{$Q^2$}{Compare}
-\twofig{symm/Q1,-,Q2,Q1-,EPS-14}{Continuous $\Pf$}{symm/Q1-,Q2,Q2,Q1-,EPS-14}{Mixed-$\Pf$}{Compare}
-
-Without rotation, but with intentional violation of inf-sup,
-\reffig{symm/Q1,-,Q1,Q1,EPS-14:both}.
-
-Drop order of $\Pf$/$\Ps$, \reffig{symm/Q1,-,Q2,Q1-,EPS-14:both}.
+[In this section, we study the convergence of some selected combinations of
+  element spaces on the Barry-Mercer problem. Need to make a list of relevant
+  elements.]
 
 \section{Concluding remarks}
 
