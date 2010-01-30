@@ -20,16 +20,19 @@ data/iter-%.gp: data/iter-template.gpt
 	(n=$@; n=$${n#data/iter-}; n=$${n%.gp}; \
 	sed -e "s/XX/$$n/g" data/iter-template.gpt > $@)
 
-%.gp: data/gptoeps
-	data/gptoeps $@
-
-%.pdf: %.gp
-	epstopdf --outfile $@.tmp $(subst .gp,.eps,$<)
-	pdfcrop $@.tmp $@
-	rm -f $@.tmp
+#%.gp: data/gptoeps
+#	data/gptoeps $@
+#
+#%.pdf: %.gp
+#	epstopdf --outfile $@.tmp $(subst .gp,.eps,$<)
+#	pdfcrop $@.tmp $@
+#	rm -f $@.tmp
 
 data/%.pdf: data/%.tex
 	pdflatex --output-directory data/ $<
+
+%.pdf: data/pyplot.py
+	SAVE=1 python data/pyplot.py $@
 
 bibtex: version
 	latexmk -f -quiet -pdf report
