@@ -31,8 +31,14 @@ data/iter-%.gp: data/iter-template.gpt
 data/%.pdf: data/%.tex
 	pdflatex --output-directory data/ $<
 
-%.pdf: data/pyplot.py
-	SAVE=1 python data/pyplot.py $@
+data/symm/%.pdf: data/plot_raw.py
+	data/pyplot $< $@
+data/asymm/%.pdf: data/plot_raw.py
+	data/pyplot $< $@
+data/barry-mercer/%.pdf: data/plot_raw.py
+	data/pyplot $< $@
+data/u-locking.pdf: data/u_locking.py
+	data/pyplot $< $@
 
 bibtex: version
 	latexmk -f -quiet -pdf report
