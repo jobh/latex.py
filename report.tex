@@ -4,7 +4,9 @@
 %@PREFIX_ = '\\'
 
 %@def fig(name, text, opt=None): print name
-%@def twofig(n1, t1, n2, t2, text, opt=None): print n1+"\n"+n2
+%@def twofig(n1, t1, n2, t2, text, opt=None): print n1+'\n'+n2
+%@def allfig(name, text, opt=None):
+%@    for i in [1,4,14]: print '%s,EPS-%d\n'%(name,i)
 %@def includegraphics(name, opt=None): print name
 
 \input{header}
@@ -349,10 +351,8 @@ solid pressure; then the fluid pressure takes over in the middle layer; and
 finally, in the bottom layer, a combination of fluid/solid pressure and
 volumetric strain takes the load.
 
-\fig[width=\textwidth]{symm/Q0,RT1,Q1,-}{Correct solution for the constant-load
-problem. From left to right: $\epsilon=10^{-1}$, $\epsilon=10^{-4}$, $\epsilon=10^{-14}$.}
-\fig[width=\textwidth]{asymm/Q0,RT1,CR1,Q0}{Correct solution for the variable-load
-problem. From left to right: $\epsilon=10^{-1}$, $\epsilon=10^{-4}$, $\epsilon=10^{-14}$.}
+\allfig{symm/Q0,RT1,Q1,-}{Correct solution for the constant-load problem.}
+\allfig{asymm/Q0,RT1,CR1,Q0}{Correct solution for the variable-load problem.}
 
 [The following is an outline of the argument / evidence. To be filled in with prose.]
 \begin{itemize}

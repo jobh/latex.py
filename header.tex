@@ -104,6 +104,17 @@
   \end{figure}
 }
 
+\newcommand{\allfig}[3][] {
+  \begin{figure}
+    \ffigbox[#1]
+    {
+      \subfloat[$\epsilon=10^{-1}$]{\label{fig:#2:a}\includegraphics[width=.29\textwidth]{data/#2,EPS-1}}
+      \subfloat[$\epsilon=10^{-4}$]{\label{fig:#2:b}\includegraphics[width=.29\textwidth]{data/#2,EPS-4}}
+      \subfloat[$\epsilon=10^{-14}$]{\label{fig:#2:c}\includegraphics[width=.29\textwidth]{data/#2,EPS-14}}
+    }
+    {\caption{\draft{\bf\tiny[#2] }#3}\label{fig:#2}}
+  \end{figure}}
+
 \pgfdeclarepatternformonly%
 {inside domain}
 { % bounding box lower left
