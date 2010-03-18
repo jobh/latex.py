@@ -4,18 +4,13 @@ Latex preprocessor. There are three main use cases:
 
 1) Write macros in python. Because it's simpler? More powerful libraries?
    Use '@' instead of '\' as macro prefix. Typical build process:
-     python parse.py -i macros.py -o manuscript.texp manuscript.tex
-     pdflatex manuscript.texp
-     bibtex manuscript
-     [etc]
+     python parse.py -i macros.py -o manuscript.pdf manuscript.tex
 
 2) Expand user-defined macros in text, because some journals don't like these.
    Uses '\' as macro prefix, but replaces as many as possible with their
    expansions. Add "-e EXPAND_INPUT=False" to leave \input statements alone
    (they are still parsed for \newcommand).
-
      python parse.py -L -o manuscript.texp manuscript.tex
-     [and then as in (1)].
 
 3) Parse a latex file to determine its dependencies, for use in makefiles etc.
      deps=$(python parse.py \
@@ -116,7 +111,7 @@ The rules:
 1}%
 {2}
 
---- As a special case, exactly one latex-style (square bracket) optional argument
+--- As a special case, exactly one latex-style optional (square bracket) argument
 --- can be used. It is moved to the end:
 %@def testme(exp, base='10'):
 %@    return '$%s^{%s}$' % (base, exp)
@@ -128,28 +123,27 @@ or
 
 --- The command prefix etc can be redefined. This can be handy to
 --- expand macros in a latex file without changing them. See also '-L' mode, which does
---- this better.
+--- this better, by also understanding \newcommand and \input.
 %@_PREFIX_ = '\\'
 
 --- There are two allowed syntactic sugarings for returning text:
 %@@out
 %@def testme(exp, base='10'):
-$@    : '$%s^{%s}$' % (base, exp)
+%@    _($%s^{%s}$' % (base, exp))
 --- The other one is the simple string substitution described above (see frac2).
 --- But this one allows multiple lines of text. Let's try a more complicated
 --- example:
 {%@
-### (must use @out, magical syntax: r'^\s+:\s*<strs>'->out(<strs>))
-@out
+@multiline
 def autotable(f,rows):
   rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
-  : r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&'))
-  : r'\toprule'
-  : rows[0]
-  : r'\midrule'
-  : rows[1:]
-  : r'\bottomrule'
-  : r'\end{matrix}'
+  _(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
+  _(r'\toprule')
+  _(rows[0])
+  _(r'\midrule')
+  _(rows[1:])
+  _(r'\bottomrule')
+  _(r'\end{matrix}')
 }%@
 
 --- This input:
@@ -158,7 +152,7 @@ x & y & z\\
 r & b & x\\
 a & f & f
 }
---- returns:
+--- expands into:
 \begin{matrix}{rcc}
 \toprule
 x & y & z\\
@@ -209,21 +203,21 @@ parser_scope = { s_exec   : '%@',
                  }
 
 ########## Used by the @out definitions (see above) ###############
-out_lines = []
-def print_out(str_or_list):
-    global out_lines
+def _(str_or_list):
+    global _lines
     if type(str_or_list) is str:
-        out_lines.append(str_or_list)
+        _lines.append(str_or_list)
     else:
-        out_lines += str_or_list
-def out(func):
-    def func_composed(*args):
-        global out_lines
+        _lines.extend(str_or_list)
+
+def multiline(func):
+    def func_wrapper(*args):
+        global _lines
+        _lines = []
         func(*args)
-        result = '\n'.join(out_lines)
-        out_lines = []
-        return result
-    return func_composed
+        result = '\n'.join(_lines)
+        return '\n'.join(_lines)
+    return func_wrapper
 ###################################################################
 
 # Return one argument, formatted as a python string.
@@ -262,8 +256,8 @@ def consume_args(l):
 
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
-replacers = [(re.compile(r'^(\s+):(.*)$'), r'\1print_out(\2)'), # ":" output
-             (re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] =')]   # reserved word?
+replacers = [(re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] =')]   # reserved word?
+
 def fixup_line(l):
     for replace_re, replace_with in replacers:
         l = replace_re.sub(replace_with, l)
@@ -366,6 +360,10 @@ def parse(inf_name):
                     args,l_after_macro = consume_args(l_after_macro)
                     len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                     args = ','.join(args)
+
+                    global current_match
+                    current_match = l[match.start():match.start()+len_of_match]
+
                     if type(comm_obj) is str:
                         # The definition is a format string
                         eval_str = 'r"""%s"""%%((%s))'%(comm_obj,args)
@@ -497,13 +495,15 @@ class latex_new_comm(object):
         self.set_definition(definition)
         self.finished = True
 
+IGNORE_CMDS = []
 def latex_newcommand(name, definition=None):
-    command = latex_new_comm(name, definition)
-    old_cmd = parser_scope.get(name[1:])
-    if old_cmd == ignore_me:
+    global current_match
+    if name[1:] in IGNORE_CMDS:
         if parser_scope[s_verbose] >= 3:
             print >>sys.stderr, r'++ Ignoring \newcommand{%s}'%name
-        raise StopIteration
+        return escape(current_match)
+    command = latex_new_comm(name, definition)
+    old_cmd = parser_scope.get(name[1:])
     if old_cmd and parser_scope[s_verbose] >= 2:
         print >>sys.stderr, r'++ Redefining %s'%name
     parser_scope[name[1:]] = command
@@ -511,21 +511,24 @@ def latex_newcommand(name, definition=None):
         return name             # finish definition in new_comm.__call__
 
 def latex_renewcommand(name, definition=None):
-    old_cmd = parser_scope.get(name[1:])
-    if old_cmd and old_cmd != ignore_me:
+    if name[1:] in IGNORE_CMDS:
+        if parser_scope[s_verbose] >= 3:
+            print >>sys.stderr, r'++ Ignoring \renewcommand{%s}'%name
+        return escape(current_match)
+    if name[1:] in parser_scope:
         del parser_scope[name[1:]]
     return latex_newcommand(name, definition)
 
 def latex_input(name):
     lines = parse(name+'.tex')
-    if parser_scope.get('EXPAND_INPUT') != False:
+    if parser_scope.get('EXPAND_INPUT', True):
         if lines:
             lines[-1] = lines[-1].strip()
         # parse() has already processed the lines, don't do it again
         lines = map(escape, lines)
         return ''.join(lines)
     else:
-        return escape(r'\input{%s}'%name)
+        ignore_me()
 
 
 def set_latex_parse_mode():
@@ -615,6 +618,7 @@ if __name__ == '__main__':
             sys.exit(0)
         elif arg == '-I' or arg == '--ignore':
             idx += 1
+            IGNORE_CMDS.append(sys.argv[idx])
             parser_scope[sys.argv[idx]] = ignore_me
         else:
             break

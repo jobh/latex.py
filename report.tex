@@ -1,14 +1,3 @@
-%@OUTPUT_ = False
-%@VERBOSE_ = 0
-%@ABORT_ = False
-%@PREFIX_ = '\\'
-
-%@def fig(name, text, opt=None): print name
-%@def twofig(n1, t1, n2, t2, text, opt=None): print n1+'\n'+n2
-%@def allfig(name, text, opt=None):
-%@    for i in [1,4,14]: print '%s,EPS-%d\n'%(name,i)
-%@def includegraphics(name, opt=None): print name
-
 \input{header}
 
 \begin{document}
@@ -159,7 +148,7 @@ $\V{\omega}$ in the domain $\Omega$:
   \cdot \V{t}_{\V{n}} \D\Gamma.
 \end{gather}
 %
-The normal flux $f_{\V{n}}=\vD\cdot\V n$ and normal stress $\V{t}_{\V{n}}$ on the boundary
+The normal flux $f_{\V{n}}=\vD\cdot\V{n}$ and normal stress $\V{t}_{\V{n}}$ on the boundary
 $\Gamma$ appear here as natural boundary conditions. 
 The discrete finite element approximation follows from solving
 \refeqs{weakpress}{weakdispl} in finite-dimensional spaces.
