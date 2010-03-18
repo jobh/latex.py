@@ -385,8 +385,30 @@ divergence-free $\U$.
 We introduce here the hypothesis that the pressure oscillations are caused by a
 failure of the finite element spaces in the coupled system to fulfill the
 Babuska-Brezzi [ref] inf-sup condition.
-This is inspired by the similar roles that $\Pf$ and $\Ps$ play in relation to $\U$
-in \refeqs{mixu1}{mixu2} and \eqref{eq:sim1}.
+This is inspired by the similar roles that $\Pf$ and $\Ps$ play in relation to
+$\U$.
+In regular elasticity (not poroelasticity), the introduction of a solid
+pressure field is mandatory when incompressible materials are modelled
+($\nu=0.5$, $\lambda\rightarrow\infty$).
+This leads to a saddle-point problem which must fulfill the Babuska-Brezzi
+conditions; these conditions lead to restrictions on the finite element spaces
+that are used.
+With constant material parameters for simplicity, this system reads as
+\begin{align}
+  \mu \nabla \nabla \cdot \U + \mu \onabla^2 \U - \nabla \Ps &= \V{r}\\
+  \nabla \cdot \U &= 0.
+\end{align}
+Compare this with the poroelastic equations with impermeable materials,
+$\epsilon\rightarrow 0$.
+Under the conditions of $S=q=\nabla\cdot\prev{\U}=0$, either of
+\refeq{sim1} (with $\Lambda\rightarrow 0$), or \refeq{simp1} (with
+$\vD\rightarrow 0$ lead to the same set of equations (except for a factor in
+the first term),
+\begin{align}
+(\lambda+\mu) \nabla \nabla \cdot \U + \mu \onabla^2 \U - \nabla \Pf &= \V{r}\\
+\nabla \cdot \U &= 0
+\end{align}
+
 It is well known that only combinations of element spaces that satisfy the
 inf-sup condition are stable for the $\U$-$\Ps$ system.
 We shall present experimental evidence showing that the fluid pressure

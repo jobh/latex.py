@@ -1,265 +1,632 @@
-"""
-The rules:
--- lines starting with %@ are executed normally in python
--- same for lines between "%@{" and "%@}"
--- execution happens after a block
--- can be redefined by "%@ RAW='%%%'" which takes hold after block
+r"""usage: python parse.py [args] file [file2 ...]
 
--- these are used to define MACROS as python functions
--- replaced by the RETURN VALUE of the function
--- the 'print' goes to stdout, possibly for debugging
-%@def middle(a,b,c):
-%@    print '% picking option 2 of 3'
-%@    return b
--> % picking option 2 of 3
+Latex preprocessor. There are three main use cases:
+
+1) Write macros in python. Because it's simpler? More powerful libraries?
+   Use '@' instead of '\' as macro prefix. Typical build process:
+     python parse.py -i macros.py -o manuscript.texp manuscript.tex
+     pdflatex manuscript.texp
+     bibtex manuscript
+     [etc]
+
+2) Expand user-defined macros in text, because some journals don't like these.
+   Uses '\' as macro prefix, but replaces as many as possible with their
+   expansions. Add "-e EXPAND_INPUT=False" to leave \input statements alone
+   (they are still parsed for \newcommand).
+
+     python parse.py -L -o manuscript.texp manuscript.tex
+     [and then as in (1)].
+
+3) Parse a latex file to determine its dependencies, for use in makefiles etc.
+     deps=$(python parse.py \
+            -P includegraphics:1:%s.pdf \
+            -P input:1:%s.tex \
+            -P bibliography:1:%s.bib \
+            manuscript.tex)
+   (or if python macros are used:)
+     deps=$(python parse.py -i macros.py manuscript.tex | python parse.py \
+            -P includegraphics:1:%s.pdf \
+            -P bibliography:1:%s.bib)
+
+=== Optional arguments ===
+
+    -o <file>
+    --output <file>      Output filename [stdout]. If extension is .ps, .dvi
+                         or .pdf, build document using latexmk (preprocessed
+                         file will then be called <basename>.texp).
+    -v <level>
+    --verbose <level>    0: print nothing, 1: print errors except KeyError,
+                         [2]: print all errors, 3: print a lot.
+    -a <level>
+    --abort <level>      Abort on any error that the same verbosity level
+                         would print (with -v). It should normally not be set
+                         higher than the verbosity.
+    -i <file>
+    --include <file>     Execute python file in the parser namespace. Some
+                         substitutions are done on the input file (it is
+                         treated like an "%@" exec block, only without the
+                         prefix).
+    -e <expr>
+    --expression <expr>  Execute an expression in the parser namespace.
+
+    -q
+    --quiet              Don't output anything. Same effect as '-o /dev/null'.
+
+    -L
+    --parse-latex-commands
+                         Parse a latex file. Understands '\newcommand' and
+                         '\input'. The effect is to expand any user-defined
+                         latex macros in the text.
+                         Implies '-v 1', since we expect a lot of KeyErrors.
+    -P <cmd>
+    --print-cmd <cmd>    Make the given command print its arguments.
+                         Implies '-L -q', and additionally defines a macro
+                         '\<cmd>' that simply prints its argument to stdout.
+                         Can also use <cmd>:<n> which prints only the n'th
+                         argument, or <cmd>:<n>:<format_str> which applies
+                         <format_str> to print the argument. See (3) above.
+    -I <cmd>
+    --ignore <cmd>       Ignore this macro (leave it unexpanded).
+                         Useful also to silence unwanted warnings, for example
+                         in e-mail addresses (use '-I gmail -I simula'). Note
+                         that this is not needed for correctness, since
+                         '@gmail' will just raise KeyError and be left alone.
+                         Alternatively, use '-v 1' to ignore all KeyErrors.
+
+    -h
+    --help               Print this text and more
+"""
+
+usage_comments = r"""
+The rules:
+
+-- Lines starting with %@ are executed normally in python
+
+-- Same for lines between "{%@" and "}%@" (note that any text on the lines
+-- containing [{}]%@ will be ignored):
+--  {%@
+--  <python code>
+--  }%@
+
+-- execution happens after a block is closed (by a line without %@, or with }%@)
+
+-- The stuff above is used to define MACROS as python functions,
+-- these are replaced by the RETURN VALUE of the function upon use.
+
+-- IMPORTANT: Macro names consists of alphanumerics plus '*' (no underscores).
+-- Change _PATTERN_ if you must.
 
 --- Typical definitions are like the following. These work exactly
---- the same, roman2 is only useful for simple substitutions though.
-%@roman1 = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
-%@roman2 = r'\mathrm{%s/%s}'
+--- the same, frac2 is only useful for simple substitutions though.
+%@frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
 
---- more debugging?
-%@print roman1('a','b')
--> \mathrm{a/b}
-%@print middle(1,2,3)
--> 2
+%@frac2 = r'\mathrm{%s/%s}'
 
-%@ABORT_=False
---- Check it out. If replacement fails (@roman1), it is an error; 
---- but with ABORT_=False, it is left in place.
-|@middle{a}{b}| |@roman2{yo}{no}| |@roman1{yo}|
--> |b| |\mathrm{yo/no}| |(at)roman1{yo}|
+%@def frac3(x,y):
+%@    return r'\mathrm{%s/%s}'%(x,y)
 
---- Multiple lines are ok EXCEPT the opening '{' must immediately follow 
---- the command name and closing '}' of previous arg.
---- A no-argument macro may also be followed by any other non-alphanumerical
---- character (or end-of-line).
---- Notice also the recursive expansion happening here.
-And now, |@roman1{@middle{a}{
-{yo}yo
-}{b}}{no}|
--> \mathrm{{yo}yo/no}
+--- Macro arguments over multiple lines are ok IFF either the line breaks are
+--- within the enclosing brackets, or line continuations (%) are used. Examples:
 
---- OK. We can allow a '%' following a '}' to break line.
-@middle{}%
-{WOrked?}%
-{yy}
--> WOrked?
+@frac{1}{2}
 
---- recursive expansion works with mixed defined/undefined/etc
-|@roman1{@comb{a}{{yo}yo}{b}}{no}|
--> \mathrm{@.../no}
+@frac  {1}  {2}
 
-%@VERBOSE_ = 3
-%@triplicate = '{1}{%s}{2}'
-Or try this, |@roman1{@middle@triplicate{yo}}{no}|
--> |\mathrm{(at)middle{1}{yo}{3}/no}|
---- Line is evaluated left-to-right
+@frac{
+1}%
+{2}
 
---- The command prefix can be redefined. This can be handy to
---- expand macros in a latex file without changing them.
-%@VERBOSE_ = 1
-%@PREFIX_ = '\\'
-%@EXEC_ = '%'
+--- As a special case, exactly one latex-style (square bracket) optional argument
+--- can be used. It is moved to the end:
+%@def testme(exp, base='10'):
+%@    return '$%s^{%s}$' % (base, exp)
+--- can be called as
+@testme[10]{5.4}
+@testme{5.4}
+or
+@testme{5.4}{10}
 
---- Let's try a more complicated one:
-\newcommand{\comment}{}
-\comment{
-%{
-### (must use @out, magical syntax r'^\s+:\s*<strs>'->out(<strs>))
+--- The command prefix etc can be redefined. This can be handy to
+--- expand macros in a latex file without changing them. See also '-L' mode, which does
+--- this better.
+%@_PREFIX_ = '\\'
+
+--- There are two allowed syntactic sugarings for returning text:
+%@@out
+%@def testme(exp, base='10'):
+$@    : '$%s^{%s}$' % (base, exp)
+--- The other one is the simple string substitution described above (see frac2).
+--- But this one allows multiple lines of text. Let's try a more complicated
+--- example:
+{%@
+### (must use @out, magical syntax: r'^\s+:\s*<strs>'->out(<strs>))
 @out
-def automat(f,a):
-  lines = [l.strip()+r'\\' for l in a.split(r'\\')]
-  : r'\begin{matrix}{%s%s}' % (f[0], f[1]*lines[0].count('&'))
+def autotable(f,rows):
+  rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
+  : r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&'))
   : r'\toprule'
-  : lines[0]
+  : rows[0]
   : r'\midrule'
-  : lines[1:]
+  : rows[1:]
   : r'\bottomrule'
   : r'\end{matrix}'
-%}
-}
-\automat{rc}{
+}%@
+
+--- This input:
+@autotable{rc}{
 x & y & z\\
 r & b & x\\
 a & f & f
 }
+--- returns:
+\begin{matrix}{rcc}
+\toprule
+x & y & z\\
+\midrule
+r & b & x\\
+a & f & f
+\bottomrule
+\end{matrix}
 
---- Try something with no args
-%Z = 'Zappa dude'
-(expands)
-\Z
-\Z\now
-\Z now
-\Z%now
-(expands not)
-\Zxnow
-\triplicate%now
+--- Working around python reserved words. These are allowed in *plain assignments* only.
+--- like this:
+%@def = r'Definition:'
+%@del = r'\nabla'
 
---- Working around python reserved words
-%VERBOSE_ = 3
+--- The same technique can be used to create macros that contain characters that aren't
+--- legal in identifiers in python (*).
+--- If you want to use this for functions, use lambda or aliases:
+%@def* = lambda x: "Definition:"+x
 
-%del = 'yammer'
-\del
--> yammer
-
-Ok, let's get out of \roman2{here}{now}!
-%ABORT_=True
-\roman2
+%@@out
+%@def _def(x):
+%@    : "Definition: "+x
+%@def* = _def
 """
 
-import sys, re
+import sys
+import os
+import re
 
-macros = { 'EXEC_'    : '%@',
-           'PREFIX_' : '@',
-           'ESCAPE_' : '{_}',
-	   'ABORT_'  : True,
-           'VERBOSE_': 2,
-	   'WRAP_'   : False,
-	   'OUTPUT_' : True}
+s_exec    = '_EXEC_'
+s_prefix  = '_PREFIX_'
+s_escape  = '_ESCAPE_'
+s_abort   = '_ABORT_'
+s_verbose = '_VERBOSE_'
+s_output  = '_OUTPUT_'
+s_dummy   = '_DUMMY_'
+s_pattern = '_PATTERN_'
 
-try:
-	import textwrap
-	wrapper = textwrap.TextWrapper(break_long_words=False, break_on_hyphens=False)
-except:
-	wrapper = None
+parser_scope = { s_exec   : '%@',
+                 s_prefix : '@',
+                 s_escape : '{_}',
+                 s_dummy  : '{__}',
+                 s_abort  : 1,       # 0: never, 1: anything but KeyError/StopIteration,
+                                     # 2: anything but StopIteration, 3: all exceptions
+                 s_verbose: 2,       # ditto, plus 3: successful expansions
+                 s_output : True,
+                 s_pattern: r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]',
+                 }
 
+########## Used by the @out definitions (see above) ###############
 out_lines = []
 def print_out(str_or_list):
-	global out_lines
-	if type(str_or_list) is str:
-		out_lines.append(str_or_list)
-	else:
-		out_lines += str_or_list
+    global out_lines
+    if type(str_or_list) is str:
+        out_lines.append(str_or_list)
+    else:
+        out_lines += str_or_list
 def out(func):
-	def func_composed(*args):
-		global out_lines
-		func(*args)
-		result = '\n'.join(out_lines)
-		if macros['WRAP_'] and wrapper:
-			result = wrapper.fill(result)
-		out_lines = []
-		return result
-	return func_composed
+    def func_composed(*args):
+        global out_lines
+        func(*args)
+        result = '\n'.join(out_lines)
+        out_lines = []
+        return result
+    return func_composed
+###################################################################
 
+# Return one argument, formatted as a python string.
 def consume_arg(l):
-	level = 0
-	pos = 0
-	for c in l:
-		if   c in ['{','[']: level += 1
-		elif c in ['}',']']: level -= 1
-		pos += 1
-		if level == 0:
-			return ('r"""%s"""'%l[1:pos-1],l[pos:])
+    level = 0
+    pos = 0
+    for c in l[pos:]:
+        if   c in ['{','[']: level += 1
+        elif c in ['}',']']: level -= 1
+        pos += 1
+        if level == 0:
+            (arg, rest_of_line) = l[1:pos-1], l[pos:]
+            assert not '"""' in arg
+            return ('r"""%s"""'%arg, rest_of_line)
 
+# Return as many arguments as possible. Ignore spaces between arguments,
+# and allow exactly one optional argument [] if it comes first. The optional
+# argument is moved to the last position, to allow the standard "def a(x,y='')".
 def consume_args(l):
-	args = []
-	optarg = None
-	if l and l[0] == '[':
-		(optarg,l) = consume_arg(l)
-	while True:
-		if not l or l[0] != '{':
-			if optarg: args.append(optarg)
-			return args, l
-		(arg,l) = consume_arg(l)
-		args.append(arg)
+    args = []
+    optarg = None
+    pos = 0
+    while len(l) > pos and l[pos] == ' ':
+        pos += 1
+    if len(l) > pos and l[pos] == '[':
+        (optarg,l) = consume_arg(l[pos:])
+    while True:
+        pos = 0
+        while len(l) > pos and l[pos] == ' ':
+            pos += 1
+        if len(l) <= pos or l[pos] != '{':
+            if optarg: args.append(optarg)
+            return args, l
+        (arg,l) = consume_arg(l[pos:])
+        args.append(arg)
 
+# Some text substitutions on the line, to simplify the rest of the parsing.
+# These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [(re.compile(r'^(\s+):(.*)$'), r'\1print_out(\2)'), # ":" output
-	     (re.compile(r'^(\w+)\s+='), r'macros[r"\1"] =')]   # reserved word?
+             (re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] =')]   # reserved word?
 def fixup_line(l):
-	for replace_re, replace_with in replacers:
-		l = replace_re.sub(replace_with, l)
-	return l
+    for replace_re, replace_with in replacers:
+        l = replace_re.sub(replace_with, l)
+    return l
 
-inf = open(sys.argv[1])
-errf = sys.stderr
-outf = len(sys.argv)>2 and open(sys.argv[2],'w') or sys.stdout
+# Returns the index of a comment / line continuation, or None if not found
+def comment_idx(l):
+    if l[0] == '%':
+        return 0
+    cmatch = re.search(r'[^\\]%', l)
+    return cmatch and cmatch.start()+1
 
-lines = ''
-collected = ''
-consuming = False
-for lno,l in enumerate(inf):
-	# Handle %@{ ... %@}
-	if l.startswith(macros['EXEC_']+'{'):
-		consuming = True
-		continue
-	elif consuming:
-		if l.startswith(macros['EXEC_']+'}'):
-			consuming = False
-			if macros['VERBOSE_']>2:
-				debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
-				errf.write(debuglines);
-			exec(lines, globals(), macros)
-			lines = ''
-		else:
-			lines += fixup_line(l);
-		continue
+def escape(line, count=-1):
+    return line.replace(parser_scope[s_prefix], parser_scope[s_escape], count)
+def unescape(line, count=-1):
+    return line.replace(parser_scope[s_escape], parser_scope[s_prefix], count)
 
-	# Handle $@
-	if l.startswith(macros['EXEC_']):
-		lines += fixup_line(l[len(macros['EXEC_']):])
-		continue
-	elif lines:
-		if macros['VERBOSE_']>2:
-			debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
-			errf.write(debuglines);
-		exec(lines, globals(), macros)
-		lines = ''
+def exec_block(lines):
+    if parser_scope[s_verbose] >= 3:
+        debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
+        errf.write(debuglines);
+    exec(lines, globals(), parser_scope)
 
-	# Handle in-line macros
-	if collected:
-		l = collected+l
-		collected = ''
-	if macros['PREFIX_'] in l:
-		# Save up lines until we are certain to have enough to process all macro(s)
-		if l.count('{') > l.count('}'):
-			# balanced braces
-			collected = l
-			continue
-		if l.endswith('}%\n'):
-			# line continuations
-			collected = l[:-2]
-			continue
+def parse(inf_name):
+    output = []
+    lines = ''
+    collected = ''
+    consuming = False
+    if inf_name == '-':
+        inf = sys.stdin
+        inf_name = 'sys.stdin'
+    else:
+        inf = open(inf_name)
 
-		re_string = re.escape(macros['PREFIX_'])+r'(\w+)[\W\n]'
-		escaped = False
-		while True:
-			match = re.search(re_string, l)
-			if not match:
-				break
+    for lno,l in enumerate(inf):
+        lno += 1
 
-			start = l[:match.start()]
-			comm = match.group(1)
-			lno = str(lno)+':'
-			try:
-				comm_obj = macros[comm]
-				args,end = consume_args(l[match.end()-1:])
-				args = ','.join(args)
-				if type(comm_obj) is str:
-					eval_str = 'r"""%s"""%%((%s))'%(comm_obj,args)
-				else:
-					# protect reserved words
-					eval_str = 'macros[r"%s"](%s)'%(comm, args)
-				result = eval(eval_str, globals(), macros)
-				if macros['VERBOSE_']>2:
-					print >>errf, lno,l.rstrip().replace('\n',r'~')
-					print >>errf, lno,' '*match.start()+'^'*(len(match.group(0))-1)
-					print >>errf, lno,'-> """%s"""'%result
-			except Exception,e:
-				if macros['VERBOSE_']>1 or \
-				  (macros['VERBOSE_']>0 and type(e) is not KeyError):
-					print >>errf, lno,l.rstrip().replace('\n',r'~')
-					print >>errf, lno,' '*match.start()+'^'*(len(match.group(0))-1)
-					print >>errf, lno,repr(e)
-				if macros['ABORT_']:
-					raise
-				escaped = True
-				result = match.group(0).replace(macros['PREFIX_'], macros['ESCAPE_'], 1)
-				end = l[match.end():]
-			l = '%s%s%s' % (start,str(result),end)
+        # Handle {%@ ... }%@. We need to save up a full block of code before
+        # exec'ing.
+        if l.startswith('{'+parser_scope[s_exec]):
+            consuming = True
+            continue
+        elif consuming:
+            if l.startswith('}'+parser_scope[s_exec]):
+                consuming = False
+                exec_block(lines)
+                lines = ''
+            else:
+                lines += fixup_line(l);
+            continue
 
-		if escaped:
-			l = l.replace(macros['ESCAPE_'], macros['PREFIX_'])
+        # Handle %@ lines. We need to save up a full block before exec'ing.
+        if l.startswith(parser_scope[s_exec]):
+            lines += fixup_line(l[len(parser_scope[s_exec]):])
+            continue
+        elif lines:
+            exec_block(lines)
+            lines = ''
 
-	if macros['OUTPUT_']:
-		outf.write(l)
+        if collected:
+            l = collected+l
+            collected = ''
+
+        # Handle in-line macros. We need to save up enough lines to be certain that
+        # all arguments are present (i.e., until braces are balanced and 
+        # line continuations (%) are eaten).
+        if parser_scope[s_prefix] in l:
+            if '%' in l:
+                # line continuations?
+                idx = comment_idx(l)
+                if idx != None:
+                    collected = l[:idx]
+                    continue
+            if l.count('{') > l.count('}'):
+                # balanced braces
+                collected = l
+                continue
+
+            re_string = re.escape(parser_scope[s_prefix])+parser_scope[s_pattern]
+
+            prefix1 = inf_name+' '+str(lno)+':'
+            prefix2 = ' '*(len(prefix1)-1)+':'
+
+            # Run through line repeatedly until no more matches are found. This means
+            # that a macro can use other macros, by repeated expansion.
+            while True:
+                # Try to match a macro name (should be successful, but maybe not
+                # if e.g. the line ends with '\\'.
+                match = re.search(re_string, l)
+                if not match:
+                    break
+
+                l_before_macro = l[:match.start()]
+                l_after_macro = l[match.end()-1:]
+                len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
+                comm = match.group(1) # the command (macro) name
+                args = eval_str = ''
+                try:
+                    comm_obj = parser_scope[comm]
+                    args,l_after_macro = consume_args(l_after_macro)
+                    len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
+                    args = ','.join(args)
+                    if type(comm_obj) is str:
+                        # The definition is a format string
+                        eval_str = 'r"""%s"""%%((%s))'%(comm_obj,args)
+                    else:
+                        # The definition is a function. Protect reserved words
+                        # by calling parser_scope['func'] instead of func.
+                        eval_str = 'parser_scope[r"%s"](%s)'%(comm, args)
+                    result = eval(eval_str, globals(), parser_scope) or parser_scope['_DUMMY_']
+                    if parser_scope[s_verbose] >= 3:
+                        print >>errf, prefix1,l.rstrip().replace('\n',r'~')
+                        print >>errf, prefix2,' '*match.start()+'^'*len_of_match
+                        print >>errf, prefix2,'>>>',eval_str,'==> """%s"""'%result
+                except Exception,e:
+                    if type(e) is StopIteration: severity = 3
+                    elif type(e) is KeyError:    severity = 2
+                    else:                        severity = 1
+
+                    verbosity = parser_scope[s_verbose]
+                    if verbosity >= severity:
+                        print >>errf, prefix1,l.rstrip().replace('\n',r'~')
+                        print >>errf, prefix2,' '*match.start()+'^'*len_of_match
+                        for s in match.group(0), args, eval_str, repr(e):
+                            if s:
+                                print >>errf, prefix2,'!!!',s
+
+                    abortity = parser_scope[s_abort]
+                    if abortity >= severity:
+                        raise
+
+                    # Replace the first prefix by an escape sequence, so that we don't try
+                    # to expand this (failed) macro again. Also adjust l_after_macro so that
+                    # the failed expansion doesn't consume any arguments.
+                    result = escape(match.group(0), 1)
+                    l_after_macro = l[match.end():]
+                l = '%s%s%s' % (l_before_macro,str(result),l_after_macro)
+
+            # Replace any escape sequences by the original
+            l = unescape(l)
+
+        # Remove space taken by macros that return nothing. It is complicated because we
+        # do not want macros that expand to nothing to introduce new totally blank lines,
+        # but blank lines in the original text should be preserved.
+        dummy = parser_scope['_DUMMY_']
+        if dummy in l:
+            l = re.sub(r'^(\s*'+dummy+r'\s*\n)+',  r'', l)
+            l = re.sub(r'\n(\s*'+dummy+r'\s*\n)+', r'\n', l)
+            l = re.sub(r'(\n\s*'+dummy+r'\s*)+$',   r'\n', l)
+            l = l.replace(dummy, '')
+
+        if parser_scope[s_output]:
+            output.append(l)
+
+    # If a file ends with an exec block, we might not notice that the block is finished.
+    if lines:
+        exec_block(lines)
+
+    return output
+
+#################### Definitions used by the process-latex-commands mode ##################
+
+# Three cases to handle:
+# 1) \newcommand{\x}{text}
+#   1: newcommand('\x', 'text')     --> ''
+# 2) \newcommand{\x}[2]{text $#1^#2$}
+#   1: newcommand('\x')             --> '\x'
+#   2: x('text $#1^#2$', '2')       --> ''
+# 3) \newcommand{\x}[3][+]{$#2^{#1#3}$}
+#   1: newcommand('\x')             --> '\x'
+#   2: x('2')                       --> '\x'
+#   3: x('$#2^{#1#3}$', '+')        --> ''
+#
+# The last one, for example, results in a definition roughly equivalent to
+# def x(arg1, arg2, arg3='+'):
+#     return '$%(2)s^{%(1)s%(2)s}$' % {'2':arg1, '3':arg2, '1':arg3}
+
+class latex_new_comm(object):
+    def __init__(self, name, definition=None):
+        if definition:
+            # Case (1.1)
+            self.finished = True
+            self.set_definition(definition)
+            self.set_nargs(0)
+        else:
+            # Case (2.1) or (3.1)
+            self.finished = False
+        self.name = name
+        self.has_opt_arg = False
+
+    def set_definition(self, definition):
+        definition = definition.replace('%', '%%')
+        self.definition = re.sub(r'#([0-9])', r'%(\1)s', definition)
+
+    def set_nargs(self, nargs):
+        self.arg_keys = [str(i+1) for i in range(nargs)]
+        self.nargs = nargs
+
+    def format(self, *args):
+        if self.has_opt_arg:
+            args = list(args)
+            if len(args) == self.nargs-1:
+                args = [self.opt_arg] + args
+            else:
+                args = [args[-1]] + args[:-1]
+        if len(args) < self.nargs:
+            raise RuntimeError('%s called with only %d args' % (self.name, len(args)))
+        if len(args) > self.nargs:
+            for arg in args[self.nargs:]:
+                if arg != '':
+                    raise RuntimeError('%s called with extra arg "%s"' % (self.name, arg))
+        return self.definition % dict(zip(self.arg_keys, args))
+
+    def __call__(self, *args):
+        if self.finished:
+            return self.format(*args)
+
+        if len(args) == 1:
+            # Case (3.2)
+            self.set_nargs(int(args[0]))
+            self.has_opt_arg = True
+            return self.name    # definition still not finished, call me again
+
+        (definition, nargs_or_opt_arg) = args
+        if self.has_opt_arg:
+            # Case (3.3)
+            self.opt_arg = nargs_or_opt_arg
+        else:
+            # Case (2.2)
+            self.set_nargs(int(nargs_or_opt_arg))
+        self.set_definition(definition)
+        self.finished = True
+
+def latex_newcommand(name, definition=None):
+    command = latex_new_comm(name, definition)
+    old_cmd = parser_scope.get(name[1:])
+    if old_cmd == ignore_me:
+        if parser_scope[s_verbose] >= 3:
+            print >>sys.stderr, r'++ Ignoring \newcommand{%s}'%name
+        raise StopIteration
+    if old_cmd and parser_scope[s_verbose] >= 2:
+        print >>sys.stderr, r'++ Redefining %s'%name
+    parser_scope[name[1:]] = command
+    if not command.finished:
+        return name             # finish definition in new_comm.__call__
+
+def latex_renewcommand(name, definition=None):
+    old_cmd = parser_scope.get(name[1:])
+    if old_cmd and old_cmd != ignore_me:
+        del parser_scope[name[1:]]
+    return latex_newcommand(name, definition)
+
+def latex_input(name):
+    lines = parse(name+'.tex')
+    if parser_scope.get('EXPAND_INPUT') != False:
+        if lines:
+            lines[-1] = lines[-1].strip()
+        # parse() has already processed the lines, don't do it again
+        lines = map(escape, lines)
+        return ''.join(lines)
+    else:
+        return escape(r'\input{%s}'%name)
+
+
+def set_latex_parse_mode():
+    parser_scope['newcommand'] = latex_newcommand
+    parser_scope['renewcommand'] = latex_newcommand
+    parser_scope['input'] = latex_input
+    parser_scope[s_verbose] = 1
+    parser_scope[s_prefix] = '\\'
+############################################################################
+
+############### Definitions used by the dependency-printing mode ###############
+def latex_print(n, format, chained_cmd):
+    def one_printer(*args):
+        print format%args[n]
+        if chained_cmd:
+            return chained_cmd(*args)
+    def all_printer(*args):
+        print '|'.join(args)
+        if chained_cmd:
+            return chained_cmd(*args)
+    if n == None:
+        return all_printer
+    else:
+        return one_printer
+
+def set_print_mode(cmd, n=None, format='%s'):
+    set_latex_parse_mode()
+    parser_scope[cmd] = latex_print(n, format, parser_scope.get(cmd))
+    parser_scope[s_output] = False
+##########################################################################
+
+def ignore_me(*args):
+    raise StopIteration
+
+if __name__ == '__main__':
+    if len(sys.argv) <= 1:
+        print __doc__
+        sys.exit(1)
+
+    outf = sys.stdout
+    errf = sys.stderr
+
+    build_type = None
+
+    idx = 1
+    while idx < len(sys.argv):
+        arg = sys.argv[idx]
+        if arg == '-o' or arg == '--output':
+            idx += 1
+            outf_name = sys.argv[idx]
+            base,ext = os.path.splitext(outf_name)
+            if ext in ['.dvi', '.pdf', '.ps']:
+                build_type = ext[1:]
+                outf_name = base+'.texp'
+            outf = open(outf_name, 'w')
+        elif arg == '-v' or arg == '--verbose':
+            idx += 1
+            parser_scope[s_verbose] = int(sys.argv[idx])
+        elif arg == '-a' or arg == '--abort':
+            idx += 1
+            parser_scope[s_abort] = int(sys.argv[idx])
+        elif arg == '-i' or arg == '--include':
+            idx += 1
+            code = map(fixup_line, open(sys.argv[idx]).readlines())
+            exec_block(''.join(code))
+        elif arg == '-e' or arg == '--expression':
+            idx += 1
+            code = fixup_line(sys.argv[idx])
+            exec_block(code)
+        elif arg == '-q' or arg == '--quiet':
+            parser_scope[s_output] = False
+        elif arg == '-L' or arg == '--parse-latex-commands':
+            set_latex_parse_mode()
+        elif arg == '-P' or arg == '--print-cmd':
+            idx += 1
+            cmd = sys.argv[idx].split(':')
+            if len(cmd) == 1:
+                set_print_mode(cmd[0])
+            elif len(cmd) == 2:
+                set_print_mode(cmd[0], int(cmd[1])-1)
+            elif len(cmd) == 3:
+                set_print_mode(cmd[0], int(cmd[1])-1, cmd[2])
+        elif arg == '-h' or arg == '--help':
+            print __doc__
+            print '========================'
+            print usage_comments
+            sys.exit(0)
+        elif arg == '-I' or arg == '--ignore':
+            idx += 1
+            parser_scope[sys.argv[idx]] = ignore_me
+        else:
+            break
+        idx += 1
+
+    infiles = sys.argv[idx:]
+
+    for inf in infiles:
+        lines = parse(inf)
+        outf.writelines(lines)
+
+    if build_type:
+        import os
+        os.system("latexmk -f -quiet -%s %s" % (build_type, outf_name))
+        os.system("grep -A15 -m1 '^!' %s.log" % os.path.splitext(outf_name)[0])
