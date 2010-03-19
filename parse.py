@@ -127,23 +127,26 @@ or
 %@_PREFIX_ = '\\'
 
 --- There are two allowed syntactic sugarings for returning text:
-%@@out
+%@@formatted
 %@def testme(exp, base='10'):
-%@    _($%s^{%s}$' % (base, exp))
+%@    : $%(base)s^{%(exp)s}$
 --- The other one is the simple string substitution described above (see frac2).
 --- But this one allows multiple lines of text. Let's try a more complicated
---- example:
+--- example. The special syntax ': <text>' is converted to '_(r"<text"%_kwargs), where
+--- _kwargs is a dict composed from the arguments.
 {%@
-@multiline
-def autotable(f,rows):
+@formatted
+def autotable(f,rows,caption=None):
   rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
   _(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
-  _(r'\toprule')
+  :\toprule
   _(rows[0])
-  _(r'\midrule')
+  :\midrule
   _(rows[1:])
-  _(r'\bottomrule')
-  _(r'\end{matrix}')
+  :\bottomrule
+  :\end{matrix}
+  if caption:
+    :\caption{%(caption)s}
 }%@
 
 --- This input:
@@ -180,6 +183,7 @@ a & f & f
 
 import sys
 import os
+import subprocess
 import re
 
 s_exec    = '_EXEC_'
@@ -204,19 +208,24 @@ parser_scope = { s_exec   : '%@',
 
 ########## Used by the @out definitions (see above) ###############
 def _(str_or_list):
-    global _lines
-    if type(str_or_list) is str:
-        _lines.append(str_or_list)
-    else:
+    if str_or_list:
+        global _lines, _kwargs
+        if type(str_or_list) is str:
+            str_or_list = [str_or_list.strip().lstrip()]
         _lines.extend(str_or_list)
 
-def multiline(func):
+def formatted(func):
+    varnames = func.func_code.co_varnames
+    defaults = func.func_defaults
     def func_wrapper(*args):
-        global _lines
+        global _kwargs, _lines
+        n_defaults = len(varnames)-len(args)
+        if n_defaults > 0:
+            args = args + defaults[-n_defaults:]
+        _kwargs = dict(zip(varnames, args))
         _lines = []
-        func(*args)
-        result = '\n'.join(_lines)
-        return '\n'.join(_lines)
+        # If the function returns anything, return that instead
+        return func(*args) or '\n'.join(_lines)
     return func_wrapper
 ###################################################################
 
@@ -256,7 +265,10 @@ def consume_args(l):
 
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
-replacers = [(re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] =')]   # reserved word?
+replacers = [
+    (re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] ='),   # reserved word?
+    (re.compile(r'^(\s+):\s*(.*)$'), r'\1_(r"\2"%_kwargs)'),  # magic ':' syntax
+    ]
 
 def fixup_line(l):
     for replace_re, replace_with in replacers:
@@ -629,8 +641,8 @@ if __name__ == '__main__':
     for inf in infiles:
         lines = parse(inf)
         outf.writelines(lines)
+    outf.close()
 
     if build_type:
-        import os
         os.system("latexmk -f -quiet -%s %s" % (build_type, outf_name))
         os.system("grep -A15 -m1 '^!' %s.log" % os.path.splitext(outf_name)[0])

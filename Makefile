@@ -1,9 +1,9 @@
-PDFGRAPHS := $(patsubst %,data/%.pdf,$(shell python ./parse.py report.tex))
-PSGRAPHS := $(patsubst %.pdf,%.eps,$(PDFGRAPHS))
+PDFDEPS := $(shell python parse.py -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
+EPSDEPS := $(patsubst %.pdf,%.eps,$(PDFDEPS))
 ALLFILES := $(shell git ls-files | grep -v ^data/raw)
 
-report.pdf: report.tex header.tex $(PDFGRAPHS) version
-	pdflatex -interaction nonstopmode report.tex
+report.pdf: report.tex $(PDFDEPS)
+	python parse.py -L -o $@ $<
 
 view: report.pdf
 	@exec evince report.pdf 2>/dev/null &
@@ -40,9 +40,6 @@ data/barry-mercer/%.pdf: data/plot_raw.py
 data/u-locking.pdf: data/u_locking.py
 	data/pyplot $< $@
 
-bibtex: version
-	latexmk -f -quiet -pdf report
-
 clean:
 	rm -f *.aux *.blg *.log *~ data/*~ *.bak
 proper: clean
@@ -53,18 +50,15 @@ proper: clean
 .PHONY: publish view bibtex clean proper viewdiff sync
 
 REV := diff
-diff.pdf: report.tex $(GRAPHS) $(wildcard .git/refs/tags/$(REV)) version
+diff.pdf: report.pdf $(wildcard .git/refs/tags/$(REV))
 	! git diff --quiet $(REV) -- report.tex # Abort if no diff
 	git cat-file blob $(REV):report.tex >diff-base.tex
+	python parse.py -L -e "BASE_REV=$(REV)" -o diff-base.texp diff-base.tex
 	latexdiff --append-textcmd="fig,twofig,twofigh,threefig,fourfig,todo,todop" \
-		--exclude-textcmd='cmidrule' diff-base.tex report.tex \
-		| grep -v 'cmidrule.DIFaddFL' >diff.tex
-	rm -f diff-base.tex
-	gitver="\\DIFdel{$$(git rev-parse --short $(REV))}"; \
-	gitver="$$gitver \\DIFadd{$$(cat version)}"; \
-	printf "$$gitver" >version
+		--exclude-textcmd='cmidrule' diff-base.texp report.texp \
+		| grep -v 'cmidrule.DIFaddFL' >diff.texp
+	rm -f diff-base.tex*
 	latexmk -f -quiet -pdf diff
-	rm -f version
 
 viewdiff: diff.pdf
 	evince diff.pdf 2>/dev/null
@@ -83,14 +77,5 @@ report.dvi: report.tex header.tex $(PSGRAPHS)
 
 sync:
 	git diff --quiet || git commit -a -m "checkpoint"
-	rm -f version
 	yes|unison -auto sync
 
-
-version: $(ALLFILES) $(wildcard .git/refs/heads/*)
-	@( \
-	gitver=$$(git rev-parse --short HEAD); \
-	git diff --quiet || gitver=$$gitver+; \
-	[ -f $@ ] && oldver=$$(cat $@); \
-	[ "$$gitver" = "$$oldver" ] || printf $$gitver >$@ \
-	)
