@@ -4,9 +4,9 @@ EPSDEPS := $(patsubst %.pdf,%.eps,$(PDFDEPS))
 report.pdf: report.tex $(PDFDEPS)
 	python parse.py -L -o $@ $<
 view: report.pdf
-	@exec evince report.pdf 2>/dev/null &
+	exec evince report.pdf 2>/dev/null &
 kview: report.pdf
-	@exec okular report.pdf 2>/dev/null &
+	exec okular report.pdf 2>/dev/null &
 
 publish: .published
 .published: sync report.pdf diff.pdf
@@ -16,14 +16,9 @@ publish: .published
 
 data/%.pdf: data/%.tex
 	pdflatex --output-directory data/ $<
-
-data/symm/%.pdf: data/plot_raw.py
+data/%.pdf: data/%.py
 	data/pyplot $< $@
-data/asymm/%.pdf: data/plot_raw.py
-	data/pyplot $< $@
-data/barry-mercer/%.pdf: data/plot_raw.py
-	data/pyplot $< $@
-data/u-locking.pdf: data/u_locking.py
+data/%.pdf: data/plot_raw.py
 	data/pyplot $< $@
 
 clean:

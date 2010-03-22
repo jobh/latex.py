@@ -129,11 +129,18 @@ or
 --- There are two allowed syntactic sugarings for returning text:
 %@@formatted
 %@def testme(exp, base='10'):
-%@    : $%(base)s^{%(exp)s}$
+%@    : $#(base)^{#(exp)}$
+--- (or equivalently)
+%@def testme(exp, base='10'):
+%@    return format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
+
 --- The other one is the simple string substitution described above (see frac2).
+
 --- But this one allows multiple lines of text. Let's try a more complicated
---- example. The special syntax ': <text>' is converted to '_(r"<text"%_kwargs), where
---- _kwargs is a dict composed from the arguments.
+--- example. The special syntax ': <text>' is converted to '_(r"<text>")', where _() is a
+--- function which queues 'format(r"<text>")%_kwargs' to the output, and
+--- _kwargs is a dict composed from the arguments. format() converts from
+--- '#(name)' to '%(name)s'.
 {%@
 @formatted
 def autotable(f,rows,caption=None):
@@ -146,7 +153,7 @@ def autotable(f,rows,caption=None):
   :\bottomrule
   :\end{matrix}
   if caption:
-    :\caption{%(caption)s}
+    :\caption{#(caption)}
 }%@
 
 --- This input:
@@ -164,6 +171,9 @@ r & b & x\\
 a & f & f
 \bottomrule
 \end{matrix}
+
+--- Note that for '_()' or '_kwargs' to work, '@formatted' must be used; while 'format()',
+--- which just converts from '#(name)' to '%(name)s', can be used anywhere.
 
 --- Working around python reserved words. These are allowed in *plain assignments* only.
 --- like this:
@@ -207,12 +217,21 @@ parser_scope = { s_exec   : '%@',
                  }
 
 ########## Used by the @out definitions (see above) ###############
-def _(str_or_list):
-    if str_or_list:
+format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
+def format(s):
+    replace_re, replace_with = format_replacer
+    s = s.replace('%', '%%')
+    s = replace_re.sub(replace_with, s)
+    return s
+
+def _(strs, do_format=True):
+    if strs:
         global _lines, _kwargs
-        if type(str_or_list) is str:
-            str_or_list = [str_or_list.strip().lstrip()]
-        _lines.extend(str_or_list)
+        if type(strs) is str:
+            strs = [strs.strip().lstrip()]
+        if do_format:
+            strs = [format(s) % _kwargs for s in strs]
+        _lines.extend(strs)
 
 def formatted(func):
     varnames = func.func_code.co_varnames
@@ -267,7 +286,7 @@ def consume_args(l):
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
     (re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] ='),   # reserved word?
-    (re.compile(r'^(\s+):\s*(.*)$'), r'\1_(r"\2"%_kwargs)'),  # magic ':' syntax
+    (re.compile(r'^(\s+):\s*(.*)$'), r'\1_(r"\2")'),  # magic ':' syntax
     ]
 
 def fixup_line(l):
@@ -542,11 +561,25 @@ def latex_input(name):
     else:
         ignore_me()
 
+LATEX_ARGS={}
+def latex_usepackage(names, opt=None):
+    if opt: opt = opt.split(',')
+    else:   opt = []
+    for name in names.split(','):
+        LATEX_ARGS[name] = opt
+    ignore_me()
+def latex_documentclass(name, opt=None):
+    if opt: opt = opt.split(',')
+    else:   opt = []
+    LATEX_ARGS['documentclass'] = [name]+opt
+    ignore_me()
 
 def set_latex_parse_mode():
-    parser_scope['newcommand'] = latex_newcommand
-    parser_scope['renewcommand'] = latex_newcommand
-    parser_scope['input'] = latex_input
+    parser_scope['newcommand']    = latex_newcommand
+    parser_scope['renewcommand']  = latex_newcommand
+    parser_scope['input']         = latex_input
+    parser_scope['usepackage']    = latex_usepackage
+    parser_scope['documentclass'] = latex_documentclass
     parser_scope[s_verbose] = 1
     parser_scope[s_prefix] = '\\'
 ############################################################################
