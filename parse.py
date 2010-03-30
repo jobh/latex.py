@@ -624,10 +624,10 @@ if __name__ == '__main__':
         if arg == '-o' or arg == '--output':
             idx += 1
             outf_name = sys.argv[idx]
-            base,ext = os.path.splitext(outf_name)
+            base_name,ext = os.path.splitext(outf_name)
             if ext in ['.dvi', '.pdf', '.ps']:
                 build_type = ext[1:]
-                outf_name = base+'.texp'
+                outf_name = base_name+'.texp'
             outf = open(outf_name, 'w')
         elif arg == '-v' or arg == '--verbose':
             idx += 1
@@ -677,5 +677,14 @@ if __name__ == '__main__':
     outf.close()
 
     if build_type:
-        os.system("latexmk -f -quiet -%s %s" % (build_type, outf_name))
-        os.system("grep -A15 -m1 '^!' %s.log" % os.path.splitext(outf_name)[0])
+        def system(cmd):
+            if parser_scope[s_verbose] > 0:
+                print >>errf, '>>>', cmd
+            os.system(cmd)
+        if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
+            system("latexmk -f -quiet -%s %s" % (build_type, outf_name)) \
+                or system("grep -A15 -m1 '^!' %s.log" % base_name)
+        else:
+            print >>errf, '*** Error: "latexmk" not found in PATH, skipping build.'
+            print >>errf, '*** Use "-o %s" instead, and run %slatex on that one yourself.' % (outf_name, build_type)
+            sys.exit(1)
