@@ -6,8 +6,12 @@
 *.log
 *.eps
 *.bak
+*.pdf
+*.dvi
+*.ps
+*.pyc
+.emacs.desktop*
+*.texp
 auto
 .published
-report.pdf
-version
-data/*.pdf
+data/*.tex
