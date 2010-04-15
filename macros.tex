@@ -119,19 +119,20 @@ def allfig(name, caption, cap_width=''):
 {%@
 def version():
     abbrev = 7
-    rev = locals().get('BASE_REV')
-    if rev:
-        cmd = 'git rev-parse --short %s' % rev
+    cmd = 'git describe --dirty=+ --all --long --abbrev=%d' % abbrev
+    cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+    ver = cmd.communicate()[0]
+    if ver[-2] == '+':
+        abbrev += 1
+    ver = ver[-abbrev-1:-1]
+    try:
+        cmd = 'git rev-parse --short %s' % BASE_REV
         cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-        ver = cmd.communicate()[0].strip()
-    else:
-        cmd = 'git describe --dirty=+ --all --long --abbrev=%d' % abbrev
-        cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-        ver = cmd.communicate()[0]
-        if ver[-2] == '+':
-            abbrev += 1
-        ver = ver[-abbrev-1:-1]
-    return r'\today{} $\cdot$ '+ver
+        base_ver = cmd.communicate()[0].strip()
+        return r'\today{} $\cdot$ \DIFdel{%s} \DIFadd{%s}' % (base_ver, ver)
+    except:
+        return r'\today{} $\cdot$ '+ver
+
 }%@
 
 \date{\today}

@@ -33,14 +33,14 @@ proper: clean
 REV := diff
 diff-base.tex: $(wildcard .git/refs/tags/$(REV))
 	git cat-file blob $(REV):report.tex > $<
-report.texp: report.tex
-	python parse.py -L -o $@ $<
+diff-curr.texp: report.tex
+	python parse.py -L -e "BASE_REV='$(REV)'" -o $@ $<
 diff-base.texp: diff-base.tex
-	python parse.py -L -e "BASE_REV='$(REV)'" -a 0 -o $@ $<
+	python parse.py -L -a 0 -o $@ $<
 
-diff.pdf: report.texp diff-base.texp
-	latexdiff --append-textcmd="fig,twofig,twofigh,threefig,fourfig,todo,todop" \
-		--exclude-textcmd='cmidrule' diff-base.texp report.texp \
+diff.pdf: diff-curr.texp diff-base.texp
+	latexdiff \
+		--exclude-textcmd='cmidrule' diff-base.texp diff-curr.texp \
 		| grep -v 'cmidrule.DIFaddFL' >diff.texp
 	latexmk -f -quiet -pdf diff.texp
 

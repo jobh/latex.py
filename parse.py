@@ -198,6 +198,7 @@ import re
 
 
 ########## Global variables ###############################
+
 class args: # singleton container, not instantiated
     build_type   = None
     outf         = sys.stdout
@@ -213,6 +214,12 @@ class args: # singleton container, not instantiated
     ignore_cmds  = []
 
 parser_scope = {'_args': args}
+
+def glob_scope():
+    global parser_scope
+    scope = globals().copy()
+    scope.update(parser_scope)
+    return scope
 
 ########## Used by the @out definitions (see above) ###############
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
@@ -311,7 +318,7 @@ def exec_block(lines):
     if args.verbose >= 3:
         debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
         args.errf.write(debuglines);
-    exec(lines, globals(), parser_scope)
+    exec(lines, glob_scope(), parser_scope)
 
 def parse(inf_name):
     global args, parser_scope
@@ -405,7 +412,7 @@ def parse(inf_name):
                         # The definition is a function. Protect reserved words
                         # by calling parser_scope['func'] instead of func.
                         eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
-                    result = eval(eval_str, globals(), parser_scope) or args.dummy
+                    result = eval(eval_str, glob_scope(), parser_scope) or args.dummy
                     if args.verbose >= 3:
                         print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
                         print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
