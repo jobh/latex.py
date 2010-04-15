@@ -1,0 +1,165 @@
+\newcommand{\python}[1]{}
+%@python = ''
+
+%@def draft(x):
+%@    cl = LATEX_ARGS.get('documentclass', [])
+%@    if len(cl) > 1 and 'final' in cl[1]:
+%@        return ''
+%@    else:
+%@        return '{%s}'%x
+
+\newcommand   {\R}[1]   {\text{#1}}       % (math) roman
+\newcommand   {\del}    {\partial}
+\newcommand   {\V}[1]   {\boldsymbol{#1}}            % vector
+\newcommand   {\VV}[1]  {\mathrm{\bf #1}}           % tensor
+\newcommand   {\D}      {\,\mathrm{d}}
+
+\newcommand   {\X}[1]   {\mathrm{#1}} % vector (1D matrix)
+\newcommand   {\M}[1]   {\mathrm{#1}} % matrix
+\newcommand   {\tM}[1]  {\tilde{\M{#1}}}
+\newcommand   {\MM}[1]  {\mathcal{#1}} % block matrix
+
+\newcommand   {\T}[2][] {#2^{\!\mathsf{#1T}}}
+\newcommand   {\norm}[1]{\lVert#1\rVert}
+
+\newcommand   {\prev}[1]{\hat{#1}}
+
+%@Lambda = r'\VV{%s}' % escape(r'\Lambda')
+%@nabla  = r'\V{%s}' % escape(r'\nabla')
+%@onabla = escape(r'\nabla')
+
+\newcommand{\U} {\V{u}}
+\newcommand{\vD}{\V{v}_\R{D}}
+\newcommand{\Pf}{p_\R{f}}
+\newcommand{\Ps}{p_\R{s}}
+
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\trace}{Tr}
+
+\newcommand {\refeq}[1]  {Equation~\eqref{eq:#1}}
+\newcommand {\refeqs}[2] {Equations~\eqref{eq:#1} and~\eqref{eq:#2}}
+\newcommand {\refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
+\newcommand {\Refeq}[1]  {Equation~\eqref{eq:#1}}
+\newcommand {\Refeqr}[2] {Equations~\eqref{eq:#1}--\eqref{eq:#2}}
+\newcommand {\Refeqs}[2] {Equations~\eqref{eq:#1} and~\eqref{eq:#2}}
+\newcommand {\reffig}[1] {Figure~\ref{fig:#1}}
+\newcommand {\reffigs}[2]{Figures~\ref{fig:#1} and~\ref{fig:#2}}
+\newcommand {\Reffig}[1] {Figure~\ref{fig:#1}}
+\newcommand {\reftab}[1] {Table~\ref{tab:#1}}
+\newcommand {\Reftab}[1] {Table~\ref{tab:#1}}
+\newcommand {\reftabs}[2]{Tables~\ref{tab:#1} and~\ref{tab:#2}}
+
+\newcommand  {\todo}[1]    {\draft{\noindent\begin{graybox}{\small #1}\end{graybox}}}
+\newcommand  {\todop}[1]   {\draft{\colorbox{dimbg}{#1}\hspace{-.5ex}}}
+\newcommand  {\todos}[2][] {\todo{{#1}\begin{itemize}{#2}\end{itemize}}}
+\newcommand  {\ignore}[1]  {}
+
+\python
+{%@
+@formatted
+def fig(name, caption, width=''):
+    :\begin{figure}
+    :\ffigbox[\FBwidth]
+    :{\includegraphics[#(width)]{data/#(name)}}
+    :{\caption{\draft{\bf\tiny[#(name)] }#(caption)}\label{fig:#(name)}}
+    :\end{figure}
+}%@
+
+\python
+{%@
+@formatted
+def twofig(name1, cap1, name2, cap2, cap_both, cap_width=''):
+    :\begin{figure}
+    :\ffigbox[#(cap_width)]
+    :{
+    :\subfloat[\draft{\bf\tiny[#(name1)] }#(cap1)]%
+    :{\label{fig:#(name1)}\includegraphics[width=.45\textwidth]{data/#(name1)}}
+    :\subfloat[\draft{\bf\tiny[#(name2)] }#(cap2)]%
+    :{\label{fig:#(name2)}\includegraphics[width=.45\textwidth]{data/#(name2)}}
+    :}
+    :{\caption{#(cap_both)}\label{fig:#(name1):#(name2)}}
+    :\end{figure}
+}%@
+
+\python
+{%@
+@formatted
+def allfig(name, caption, cap_width=''):
+    :\begin{figure}
+    :\ffigbox[#(cap_width)]
+    :{
+    :\subfloat[$\epsilon=10^{-1}$]{\label{fig:#(name):a}\includegraphics[width=.29\textwidth]{data/#(name),EPS-1}}
+    :\subfloat[$\epsilon=10^{-4}$]{\label{fig:#(name):b}\includegraphics[width=.29\textwidth]{data/#(name),EPS-4}}
+    :\subfloat[$\epsilon=10^{-14}$]{\label{fig:#(name):c}\includegraphics[width=.29\textwidth]{data/#(name),EPS-14}}
+    :}
+    :{\caption{\draft{\bf\tiny[#(name)] }#(caption)}\label{fig:#(name)}}
+    :\end{figure}
+}%@
+
+\pgfdeclarepatternformonly{inside domain}%
+% bounding box lower left
+{\pgfqpoint{-1pt}{-1pt}}%
+% bounding box upper right
+{\pgfqpoint{10pt}{10pt}}%
+% step vector (cell spacing)
+{\pgfqpoint{9pt}{9pt}}%
+% pattern code
+{
+  \pgfsetlinewidth{0.4pt}
+  \pgfpathmoveto{\pgfqpoint{0pt}{0pt}}
+  \pgfpathlineto{\pgfqpoint{9.1pt}{9.1pt}}
+  \pgfusepath{stroke}
+}
+
+\newlength{\fracheight}
+\settoheight{\fracheight}{$\frac{T}{x}$}
+\newcommand{\fracspacer}{\rule[-\fracheight]{0pt}{0pt}}
+
+\python
+{%@
+def version():
+    abbrev = 7
+    rev = locals().get('BASE_REV')
+    if rev:
+        cmd = 'git rev-parse --short %s' % rev
+        cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+        ver = cmd.communicate()[0].strip()
+    else:
+        cmd = 'git describe --dirty=+ --all --long --abbrev=%d' % abbrev
+        cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+        ver = cmd.communicate()[0]
+        if ver[-2] == '+':
+            abbrev += 1
+        ver = ver[-abbrev-1:-1]
+    return r'\today{} $\cdot$ '+ver
+}%@
+
+\date{\today}
+
+\newcommand{\ptikz}[1]{\protect\tikz{\protect #1}}
+
+\newcommand{\BJ}{\ensuremath{\R{SJ}}}
+\newcommand{\GS}{\ensuremath{\R{GS}}}
+\newcommand{\SGS}{\ensuremath{\R{SGS}}}
+\newcommand{\cBJ}{\ensuremath{\R{CJ}}}
+\newcommand{\cSGS}{\ensuremath{\R{CSGS}}}
+\newcommand{\sBJ}{\ensuremath{\R{GJ($-1$)}}}
+\newcommand{\sGS}{\ensuremath{\R{GGS}}}
+\newcommand{\sSGS}{\ensuremath{\R{GSGS}}}
+\newcommand{\GJ}[1]{\ensuremath{\R{GJ($#1$)}}}
+\newcommand{\sSGScg}{\ensuremath{\R{GSGS/CG}}}
+
+\newsavebox{\mybox}
+\newlength{\myboxlen}
+\python
+{%@
+@formatted
+def capbox(caption, width, adj='-1ex'):
+    :\sbox{\mybox}{width}
+    :\settowidth{\myboxlen}{\usebox{\mybox}}
+    :\addtolength{\myboxlen}{#(adj)}
+    :\tabcap{\myboxlen}
+    if caption:
+        :\caption{#(caption)}
+    :\usebox{\mybox}
+}%@

@@ -196,25 +196,23 @@ import os
 import subprocess
 import re
 
-s_exec    = '_EXEC_'
-s_prefix  = '_PREFIX_'
-s_escape  = '_ESCAPE_'
-s_abort   = '_ABORT_'
-s_verbose = '_VERBOSE_'
-s_output  = '_OUTPUT_'
-s_dummy   = '_DUMMY_'
-s_pattern = '_PATTERN_'
 
-parser_scope = { s_exec   : '%@',
-                 s_prefix : '@',
-                 s_escape : '{_}',
-                 s_dummy  : '{__}',
-                 s_abort  : 1,       # 0: never, 1: anything but KeyError/StopIteration,
-                                     # 2: anything but StopIteration, 3: all exceptions
-                 s_verbose: 2,       # ditto, plus 3: successful expansions
-                 s_output : True,
-                 s_pattern: r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]',
-                 }
+########## Global variables ###############################
+class args: # singleton container, not instantiated
+    build_type   = None
+    outf         = sys.stdout
+    errf         = sys.stderr
+    verbose      = 2
+    abort        = 1
+    output       = True
+    block_prefix = '%@'
+    macro_prefix = '@'
+    escape       = '{_}'
+    dummy        = '{__}'
+    pattern      = r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]'
+    ignore_cmds  = []
+
+parser_scope = {'_args': args}
 
 ########## Used by the @out definitions (see above) ###############
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
@@ -302,17 +300,22 @@ def comment_idx(l):
     return cmatch and cmatch.start()+1
 
 def escape(line, count=-1):
-    return line.replace(parser_scope[s_prefix], parser_scope[s_escape], count)
+    global args
+    return line.replace(args.macro_prefix, args.escape, count)
 def unescape(line, count=-1):
-    return line.replace(parser_scope[s_escape], parser_scope[s_prefix], count)
+    global args
+    return line.replace(args.escape, args.macro_prefix, count)
 
 def exec_block(lines):
-    if parser_scope[s_verbose] >= 3:
+    global args, parser_scope
+    if args.verbose >= 3:
         debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
-        errf.write(debuglines);
+        args.errf.write(debuglines);
     exec(lines, globals(), parser_scope)
 
 def parse(inf_name):
+    global args, parser_scope
+
     output = []
     lines = ''
     collected = ''
@@ -328,11 +331,11 @@ def parse(inf_name):
 
         # Handle {%@ ... }%@. We need to save up a full block of code before
         # exec'ing.
-        if l.startswith('{'+parser_scope[s_exec]):
+        if l.startswith('{'+args.block_prefix):
             consuming = True
             continue
         elif consuming:
-            if l.startswith('}'+parser_scope[s_exec]):
+            if l.startswith('}'+args.block_prefix):
                 consuming = False
                 exec_block(lines)
                 lines = ''
@@ -341,8 +344,8 @@ def parse(inf_name):
             continue
 
         # Handle %@ lines. We need to save up a full block before exec'ing.
-        if l.startswith(parser_scope[s_exec]):
-            lines += fixup_line(l[len(parser_scope[s_exec]):])
+        if l.startswith(args.block_prefix):
+            lines += fixup_line(l[len(args.block_prefix):])
             continue
         elif lines:
             exec_block(lines)
@@ -355,7 +358,7 @@ def parse(inf_name):
         # Handle in-line macros. We need to save up enough lines to be certain that
         # all arguments are present (i.e., until braces are balanced and 
         # line continuations (%) are eaten).
-        if parser_scope[s_prefix] in l:
+        if args.macro_prefix in l:
             if '%' in l:
                 # line continuations?
                 idx = comment_idx(l)
@@ -367,7 +370,7 @@ def parse(inf_name):
                 collected = l
                 continue
 
-            re_string = re.escape(parser_scope[s_prefix])+parser_scope[s_pattern]
+            re_string = re.escape(args.macro_prefix)+args.pattern
 
             prefix1 = inf_name+' '+str(lno)+':'
             prefix2 = ' '*(len(prefix1)-1)+':'
@@ -385,43 +388,41 @@ def parse(inf_name):
                 l_after_macro = l[match.end()-1:]
                 len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                 comm = match.group(1) # the command (macro) name
-                args = eval_str = ''
+                comm_args = eval_str = ''
                 try:
                     comm_obj = parser_scope[comm]
-                    args,l_after_macro = consume_args(l_after_macro)
+                    comm_args,l_after_macro = consume_args(l_after_macro)
                     len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
-                    args = ','.join(args)
+                    comm_args = ','.join(comm_args)
 
                     global current_match
                     current_match = l[match.start():match.start()+len_of_match]
 
                     if type(comm_obj) is str:
                         # The definition is a format string
-                        eval_str = 'r"""%s"""%%((%s))'%(comm_obj,args)
+                        eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
                     else:
                         # The definition is a function. Protect reserved words
                         # by calling parser_scope['func'] instead of func.
-                        eval_str = 'parser_scope[r"%s"](%s)'%(comm, args)
-                    result = eval(eval_str, globals(), parser_scope) or parser_scope['_DUMMY_']
-                    if parser_scope[s_verbose] >= 3:
-                        print >>errf, prefix1,l.rstrip().replace('\n',r'~')
-                        print >>errf, prefix2,' '*match.start()+'^'*len_of_match
-                        print >>errf, prefix2,'>>>',eval_str,'==> """%s"""'%result
+                        eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
+                    result = eval(eval_str, globals(), parser_scope) or args.dummy
+                    if args.verbose >= 3:
+                        print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
+                        print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
+                        print >>args.errf, prefix2,'>>>',eval_str,'==> """%s"""'%result
                 except Exception,e:
                     if type(e) is StopIteration: severity = 3
                     elif type(e) is KeyError:    severity = 2
                     else:                        severity = 1
 
-                    verbosity = parser_scope[s_verbose]
-                    if verbosity >= severity:
-                        print >>errf, prefix1,l.rstrip().replace('\n',r'~')
-                        print >>errf, prefix2,' '*match.start()+'^'*len_of_match
-                        for s in match.group(0), args, eval_str, repr(e):
+                    if args.verbose >= severity:
+                        print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
+                        print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
+                        for s in match.group(0), comm_args, eval_str, repr(e):
                             if s:
-                                print >>errf, prefix2,'!!!',s
+                                print >>args.errf, prefix2,'!!!',s
 
-                    abortity = parser_scope[s_abort]
-                    if abortity >= severity:
+                    if args.abort >= severity:
                         raise
 
                     # Replace the first prefix by an escape sequence, so that we don't try
@@ -436,15 +437,18 @@ def parse(inf_name):
 
         # Remove space taken by macros that return nothing. It is complicated because we
         # do not want macros that expand to nothing to introduce new totally blank lines,
-        # but blank lines in the original text should be preserved.
-        dummy = parser_scope['_DUMMY_']
-        if dummy in l:
-            l = re.sub(r'^(\s*'+dummy+r'\s*\n)+',  r'', l)
-            l = re.sub(r'\n(\s*'+dummy+r'\s*\n)+', r'\n', l)
-            l = re.sub(r'(\n\s*'+dummy+r'\s*)+$',   r'\n', l)
-            l = l.replace(dummy, '')
+        # but blank lines in the original text should be preserved. Note also that l may
+        # at this point contain multiple linebreaks.
+        if args.dummy in l:
+            l0 = l
+            l = re.sub(r'^(\s*('+args.dummy+r'\s*)+\n)+',  r'', l)   # lines at the start
+            l = re.sub(r'\n(\s*('+args.dummy+r'\s*)+\n)+', r'\n', l) # ... in the middle
+            l = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', l) # ... at the end
+            l = l.replace(args.dummy, '') # and finally handle lines with other non-whitespace
+            if args.verbose >= 3:
+                print >>args.errf,prefix2,'==>','"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%l.replace('\n',r'\n')
 
-        if parser_scope[s_output]:
+        if args.output:
             output.append(l)
 
     # If a file ends with an exec block, we might not notice that the block is finished.
@@ -526,24 +530,24 @@ class latex_new_comm(object):
         self.set_definition(definition)
         self.finished = True
 
-IGNORE_CMDS = []
 def latex_newcommand(name, definition=None):
-    global current_match
-    if name[1:] in IGNORE_CMDS:
-        if parser_scope[s_verbose] >= 3:
+    global current_match, args, parser_scope
+    if name[1:] in args.ignore_cmds:
+        if args.verbose >= 3:
             print >>sys.stderr, r'++ Ignoring \newcommand{%s}'%name
         return escape(current_match)
     command = latex_new_comm(name, definition)
     old_cmd = parser_scope.get(name[1:])
-    if old_cmd and parser_scope[s_verbose] >= 2:
+    if old_cmd and args.verbose >= 2:
         print >>sys.stderr, r'++ Redefining %s'%name
     parser_scope[name[1:]] = command
     if not command.finished:
         return name             # finish definition in new_comm.__call__
 
 def latex_renewcommand(name, definition=None):
-    if name[1:] in IGNORE_CMDS:
-        if parser_scope[s_verbose] >= 3:
+    global current_match, args, parser_scope
+    if name[1:] in args.ignore_cmds:
+        if args.verbose >= 3:
             print >>sys.stderr, r'++ Ignoring \renewcommand{%s}'%name
         return escape(current_match)
     if name[1:] in parser_scope:
@@ -551,6 +555,7 @@ def latex_renewcommand(name, definition=None):
     return latex_newcommand(name, definition)
 
 def latex_input(name):
+    global parser_scope
     lines = parse(name+'.tex')
     if parser_scope.get('EXPAND_INPUT', True):
         if lines:
@@ -575,13 +580,14 @@ def latex_documentclass(name, opt=None):
     ignore_me()
 
 def set_latex_parse_mode():
+    global args, parser_scope
     parser_scope['newcommand']    = latex_newcommand
     parser_scope['renewcommand']  = latex_newcommand
     parser_scope['input']         = latex_input
     parser_scope['usepackage']    = latex_usepackage
     parser_scope['documentclass'] = latex_documentclass
-    parser_scope[s_verbose] = 1
-    parser_scope[s_prefix] = '\\'
+    args.verbose = 1
+    args.macro_prefix = '\\'
 ############################################################################
 
 ############### Definitions used by the dependency-printing mode ###############
@@ -600,41 +606,46 @@ def latex_print(n, format, chained_cmd):
         return one_printer
 
 def set_print_mode(cmd, n=None, format='%s'):
+    global args, parser_scope
     set_latex_parse_mode()
     parser_scope[cmd] = latex_print(n, format, parser_scope.get(cmd))
-    parser_scope[s_output] = False
+    args.output = False
 ##########################################################################
 
 def ignore_me(*args):
     raise StopIteration
 
-if __name__ == '__main__':
+
+
+##########################################################################
+# Command-line invocation
+##########################################################################
+
+
+def parse_args():
+    global args, parser_scope
+
     if len(sys.argv) <= 1:
         print __doc__
         sys.exit(1)
-
-    outf = sys.stdout
-    errf = sys.stderr
-
-    build_type = None
 
     idx = 1
     while idx < len(sys.argv):
         arg = sys.argv[idx]
         if arg == '-o' or arg == '--output':
             idx += 1
-            outf_name = sys.argv[idx]
-            base_name,ext = os.path.splitext(outf_name)
+            args.outf_name = sys.argv[idx]
+            args.base_name, ext = os.path.splitext(args.outf_name)
             if ext in ['.dvi', '.pdf', '.ps']:
-                build_type = ext[1:]
-                outf_name = base_name+'.texp'
-            outf = open(outf_name, 'w')
+                args.build_type = ext[1:]
+                args.outf_name = args.base_name+'.texp'
+            args.outf = open(args.outf_name, 'w')
         elif arg == '-v' or arg == '--verbose':
             idx += 1
-            parser_scope[s_verbose] = int(sys.argv[idx])
+            args.verbose = int(sys.argv[idx])
         elif arg == '-a' or arg == '--abort':
             idx += 1
-            parser_scope[s_abort] = int(sys.argv[idx])
+            args.abort = int(sys.argv[idx])
         elif arg == '-i' or arg == '--include':
             idx += 1
             code = map(fixup_line, open(sys.argv[idx]).readlines())
@@ -644,7 +655,7 @@ if __name__ == '__main__':
             code = fixup_line(sys.argv[idx])
             exec_block(code)
         elif arg == '-q' or arg == '--quiet':
-            parser_scope[s_output] = False
+            args.output = False
         elif arg == '-L' or arg == '--parse-latex-commands':
             set_latex_parse_mode()
         elif arg == '-P' or arg == '--print-cmd':
@@ -663,28 +674,37 @@ if __name__ == '__main__':
             sys.exit(0)
         elif arg == '-I' or arg == '--ignore':
             idx += 1
-            IGNORE_CMDS.append(sys.argv[idx])
+            args.ignore_cmds.append(sys.argv[idx])
             parser_scope[sys.argv[idx]] = ignore_me
         else:
             break
         idx += 1
 
-    infiles = sys.argv[idx:]
+    args.infiles = sys.argv[idx:]
 
-    for inf in infiles:
+def main():
+    global args
+    parse_args()
+
+    for inf in args.infiles:
         lines = parse(inf)
-        outf.writelines(lines)
-    outf.close()
+        args.outf.writelines(lines)
 
-    if build_type:
+    if args.build_type:
+        args.outf.close()
         def system(cmd):
-            if parser_scope[s_verbose] > 0:
-                print >>errf, '>>>', cmd
+            if args.verbose > 0:
+                print >>args.errf, '>>>', cmd
             os.system(cmd)
         if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
-            system("latexmk -f -quiet -%s %s" % (build_type, outf_name)) \
-                or system("grep -A15 -m1 '^!' %s.log" % base_name)
+            system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
+                or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
         else:
-            print >>errf, '*** Error: "latexmk" not found in PATH, skipping build.'
-            print >>errf, '*** Use "-o %s" instead, and run %slatex on that one yourself.' % (outf_name, build_type)
+            print >>args.errf, '*** Error: "latexmk" not found in PATH, skipping build.'
+            print >>args.errf, '*** Use "-o %s" instead, and run %slatex on that one yourself.' \
+                % (args.outf_name, args.build_type)
             sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
