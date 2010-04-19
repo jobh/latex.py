@@ -9,8 +9,8 @@ Latex preprocessor. There are three main use cases:
 
 2) Expand user-defined macros in text, because some journals don't like these.
    Uses '\' as macro prefix, but replaces as many as possible with their
-   expansions. Add "-e EXPAND_INPUT=False" to leave \input statements alone
-   (they are still parsed for \newcommand).
+   expansions. Add "-e 'input=ignore(input)'" after -L to leave \input statements
+   alone (they are still parsed for \newcommand; 'input=ignore' stops parsing too).
      python parse.py -L -o manuscript.texp manuscript.tex
 
 3) Parse a latex file to determine its dependencies, for use in makefiles etc.
@@ -577,14 +577,11 @@ def latex_renewcommand(name, definition=None):
 def latex_input(name):
     global parser_scope
     lines = parse(name+'.tex')
-    if parser_scope.get('EXPAND_INPUT', True):
-        if lines:
-            lines[-1] = lines[-1].strip()
-        # parse() has already processed the lines, don't do it again
-        lines = map(escape, lines)
-        return ''.join(lines)
-    else:
-        ignore_me()
+    if lines:
+        lines[-1] = lines[-1].strip()
+    # parse() has already processed the lines, don't do it again
+    lines = map(escape, lines)
+    return ''.join(lines)
 
 LATEX_ARGS={}
 def latex_usepackage(names, opt=None):
@@ -592,12 +589,12 @@ def latex_usepackage(names, opt=None):
     else:   opt = []
     for name in names.split(','):
         LATEX_ARGS[name] = opt
-    ignore_me()
+    ignore()
 def latex_documentclass(name, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
     LATEX_ARGS['documentclass'] = [name]+opt
-    ignore_me()
+    ignore()
 
 def set_latex_parse_mode():
     global args, parser_scope
@@ -632,9 +629,15 @@ def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
 ##########################################################################
 
-def ignore_me(*args):
-    raise StopIteration
-
+def ignore(*args):
+    if len(args) == 1 and callable(args[0]):
+        func = args[0]
+        def f(*args):
+            func(*args)
+            ignore()
+        return f
+    else:
+        raise StopIteration
 
 
 ##########################################################################
