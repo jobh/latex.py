@@ -239,7 +239,7 @@ def _(strs, do_format=True):
         _lines.extend(strs)
 
 def formatted(func):
-    varnames = func.func_code.co_varnames
+    varnames = func.func_code.co_varnames[:func.func_code.co_argcount]
     defaults = func.func_defaults
     def func_wrapper(*args):
         global _kwargs, _lines
