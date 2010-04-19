@@ -200,7 +200,8 @@ import re
 
 ########## Global variables ###############################
 
-class args: # singleton container, not instantiated
+class args:
+    __init__     = None         # disallow instantiation
     build_type   = None
     outf         = sys.stdout
     errf         = sys.stderr
