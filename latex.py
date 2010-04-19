@@ -223,6 +223,9 @@ def glob_scope():
     return scope
 
 ########## Used by the @out definitions (see above) ###############
+pending_output = []
+current_kwargs = {}
+
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
 def format(s):
     replace_re, replace_with = format_replacer
@@ -232,27 +235,27 @@ def format(s):
 
 def _(strs, do_format=True, local_args=None):
     if strs:
-        global _lines, _kwargs
+        global pending_output, current_kwargs
         if local_args:
-            _kwargs.update(local_args)
+            current_kwargs.update(local_args)
         if type(strs) is str:
             strs = [strs.strip().lstrip()]
         if do_format:
-            strs = [format(s) % _kwargs for s in strs]
-        _lines.extend(strs)
+            strs = [format(s) % current_kwargs for s in strs]
+        pending_output.extend(strs)
 
 def formatted(func):
     varnames = func.func_code.co_varnames[:func.func_code.co_argcount]
     defaults = func.func_defaults
     def func_wrapper(*args):
-        global _kwargs, _lines
+        global current_kwargs, pending_output
         n_defaults = len(varnames)-len(args)
         if n_defaults > 0:
             args = args + defaults[-n_defaults:]
-        _kwargs = dict(zip(varnames, args))
-        _lines = []
+        current_kwargs = dict(zip(varnames, args))
+        pending_output = []
         # If the function returns anything, return that instead
-        return func(*args) or '\n'.join(_lines)
+        return func(*args) or '\n'.join(pending_output)
     return func_wrapper
 ###################################################################
 
@@ -324,7 +327,7 @@ def exec_block(lines):
     exec(lines, glob_scope(), parser_scope)
 
 def parse(inf_name):
-    global args, parser_scope
+    global args, parser_scope, pending_output
 
     output = []
     lines = ''
@@ -349,6 +352,9 @@ def parse(inf_name):
                 consuming = False
                 exec_block(lines)
                 lines = ''
+                if pending_output and args.output:
+                    output.append('\n'.join(pending_output))
+                    pending_output = []
             else:
                 lines += fixup_line(l);
             continue
@@ -360,6 +366,9 @@ def parse(inf_name):
         elif lines:
             exec_block(lines)
             lines = ''
+            if pending_output and args.output:
+                output.append('\n'.join(pending_output))
+                pending_output = []
 
         if collected:
             l = collected+l
