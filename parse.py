@@ -229,9 +229,11 @@ def format(s):
     s = replace_re.sub(replace_with, s)
     return s
 
-def _(strs, do_format=True):
+def _(strs, do_format=True, local_args=None):
     if strs:
         global _lines, _kwargs
+        if local_args:
+            _kwargs.update(local_args)
         if type(strs) is str:
             strs = [strs.strip().lstrip()]
         if do_format:
@@ -291,7 +293,7 @@ def consume_args(l):
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
     (re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] ='),   # reserved word?
-    (re.compile(r'^(\s+):\s*(.*)$'), r'\1_(r"\2")'),  # magic ':' syntax
+    (re.compile(r'^(\s+):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
     ]
 
 def fixup_line(l):
