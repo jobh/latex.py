@@ -1,0 +1,22 @@
+{%@
+@formatted
+def pdfincludes():
+    import glob
+    for c,f in enumerate(sorted(glob.glob('*,*,*,*.pdf'))):
+        name = f[:-4]
+        : \begin{figure}[p]
+        : \includegraphics[width=\textwidth]{#(name)}
+        : \caption{#(name)}
+        : \end{figure}
+        if c%2:
+            : \clearpage
+}%@
+
+\documentclass[a4]{article}
+\usepackage{graphicx}
+
+\begin{document}
+
+\pdfincludes
+
+\end{document}
