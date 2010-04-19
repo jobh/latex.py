@@ -10,7 +10,8 @@ Latex preprocessor. There are three main use cases:
 2) Expand user-defined macros in text, because some journals don't like these.
    Uses '\' as macro prefix, but replaces as many as possible with their
    expansions. Add "-e 'input=ignore(input)'" after -L to leave \input statements
-   alone (they are still parsed for \newcommand; 'input=ignore' stops parsing too).
+   alone (they are still parsed for \newcommand; '-I input' or '-e input=ignore'
+   stops parsing too).
      python parse.py -L -o manuscript.texp manuscript.tex
 
 3) Parse a latex file to determine its dependencies, for use in makefiles etc.
@@ -213,7 +214,6 @@ class args:
     escape       = '{_}'
     dummy        = '{__}'
     pattern      = r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]'
-    ignore_cmds  = []
 
 parser_scope = {'_args': args}
 
@@ -552,7 +552,7 @@ class latex_new_comm(object):
 
 def latex_newcommand(name, definition=None):
     global current_match, args, parser_scope
-    if name[1:] in args.ignore_cmds:
+    if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
             print >>sys.stderr, r'++ Ignoring \newcommand{%s}'%name
         return escape(current_match)
@@ -566,7 +566,7 @@ def latex_newcommand(name, definition=None):
 
 def latex_renewcommand(name, definition=None):
     global current_match, args, parser_scope
-    if name[1:] in args.ignore_cmds:
+    if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
             print >>sys.stderr, r'++ Ignoring \renewcommand{%s}'%name
         return escape(current_match)
@@ -695,10 +695,6 @@ def parse_args():
             print '========================'
             print usage_comments
             sys.exit(0)
-        elif arg == '-I' or arg == '--ignore':
-            idx += 1
-            args.ignore_cmds.append(sys.argv[idx])
-            parser_scope[sys.argv[idx]] = ignore_me
         else:
             break
         idx += 1
