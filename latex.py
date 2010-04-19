@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 r"""usage: python parse.py [args] file [file2 ...]
 
 Latex preprocessor. There are three main use cases:

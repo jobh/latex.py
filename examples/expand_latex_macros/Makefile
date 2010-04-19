@@ -1,8 +1,8 @@
-PDFDEPS := $(shell python parse.py -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
+PDFDEPS := $(shell latex.py -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
 EPSDEPS := $(patsubst %.pdf,%.eps,$(PDFDEPS))
 
 report.pdf: report.tex $(PDFDEPS)
-	python parse.py -L -o $@ $<
+	latex.py -L -o $@ $<
 view: report.pdf
 	exec evince report.pdf 2>/dev/null &
 kview: report.pdf
@@ -34,9 +34,9 @@ REV := diff
 diff-base.tex: $(wildcard .git/refs/tags/$(REV))
 	git cat-file blob $(REV):report.tex > $<
 diff-curr.texp: report.tex
-	python parse.py -L -e "BASE_REV='$(REV)'" -o $@ $<
+	latex.py -L -e "BASE_REV='$(REV)'" -o $@ $<
 diff-base.texp: diff-base.tex
-	python parse.py -L -a 0 -o $@ $<
+	latex.py -L -a 0 -o $@ $<
 
 diff.pdf: diff-curr.texp diff-base.texp
 	latexdiff \
@@ -60,7 +60,7 @@ data/%.eps: data/%.tex
 report.ps: report.dvi
 	dvips -o $@ $<
 report.dvi: report.tex $(EPSDEPS)
-	python parse.py -L -o $@ $<
+	latex.py -L -o $@ $<
 
 sync:
 	git diff --quiet || git commit -a -m "checkpoint"
