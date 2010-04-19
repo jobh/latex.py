@@ -1,0 +1,23 @@
+\input{header.tex}
+\usepackage[tightpage,active]{preview}
+\PreviewEnvironment{tikzpicture}
+\begin{document}
+
+\begin{tikzpicture}[scale=4.55,font=\footnotesize]
+  \filldraw[color=lightgray] (0,1) rectangle (1,1.02);
+  \draw[pattern=crosshatch,pattern color=lightgray] (0,.75) rectangle (1,1);
+  \draw[pattern color=lightgray,pattern=inside domain] (0,.25) rectangle (1,.75);
+  \draw (0,0) rectangle (1,.25);
+  \node at (0.4,0.875) {$\begin{matrix}\text{Low-compressible region}\\ \lambda=\epsilon^{-1},\;\Lambda=\VV{I}\end{matrix}$} ;
+  \node at (0.4,0.5) {$\begin{matrix}\text{Low-permeable region}\\ \lambda=1,\;\Lambda=\epsilon\VV{I}\end{matrix}$};
+  \node at (0.4,0.125) {$\begin{matrix}\text{Normal region}\\ \lambda=1,\;\Lambda=\VV{I}\end{matrix}$};
+  \draw[dashed] (.758,-.1) -- (.758,1.1);
+  \draw[->] (1.1,1.0) node[right] {Plot line} to[out=130, in=0] (.758,1.05);
+  \draw
+  (0,0)   node[left] {$0$}
+  (0,.25) node[left] {$0.25$}
+  (0,.75) node[left] {$0.75$}
+  (0,1)   node[left] {$1$};
+\end{tikzpicture}
+
+\end{document}

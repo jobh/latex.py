@@ -1,0 +1,82 @@
+#!/bin/bash
+file=${1#data/}
+
+x=${file%%/*}
+n=${1%/*}
+
+base=${file##*/}
+base=${base%.*}
+
+eps=${base#*EPS}
+space=${base%,EPS*}
+
+if [[ -f data/raw/$x.$space.EPS-1_p0000_14 ]]; then
+mkdir -p $n
+
+if [[ $eps = $space ]]; then
+    cat <<-EOF >$n/$space.gp
+	set multiplot layout 1,3
+	set data style lines
+	set grid
+	set key top left
+	set xtics ('0' 0, '0.25' .25, '0.75' .75, '1' 1)
+	EOF
+
+    for eps in EPS-{1,4,14}; do
+	pf=../raw/$x.$space.${eps}_p0000_14
+	ps=../raw/$x.$space.${eps}_p0000_25
+	st=../raw/$x.$space.${eps}_p0000_26
+	cat <<-EOF >>$n/$space.gp
+	set title '$n / $space' offset 0,-1; set format x ''
+	plot '<paste $pf $ps $st' u 1:(\$2+\$4+\$6) lw 6 t 'total vol.eq.stress', \\
+	'$pf' lw 2 title 'fluid pressure', \\
+	'$ps' lw 2 title 'solid pressure', \\
+	'$st' title 'solid strain'
+	unset key
+	EOF
+    done
+
+    echo "unset multiplot" >>$n/$space.gp
+else
+    eps=EPS$eps
+    pf=../raw/$x.$space.${eps}_p0000_14
+    ps=../raw/$x.$space.${eps}_p0000_25
+    st=../raw/$x.$space.${eps}_p0000_26
+    cat <<-EOF >$n/$space,$eps.gp
+	set data style lines
+	set grid
+	set key top left
+	set xtics ('0' 0, '0.25' .25, '0.75' .75, '1' 1)
+	plot '<paste $pf $ps $st' u 1:(\$2+\$4+\$6) lw 6 t 'total vol.eq.stress', \\
+	'$pf' lw 2 title 'fluid pressure', \\
+	'$ps' lw 2 title 'solid pressure', \\
+	'$st' title 'solid strain'
+	EOF
+fi
+fi
+
+#=============================
+
+IN=$PWD/$1
+BASE=${IN%.gp}
+OUT=$BASE.eps
+WD=${IN%/*}
+
+if grep -q multiplot $IN; then
+    SIZE=7,1.8
+else
+    SIZE=4,3
+fi
+
+COL="col"
+LW="2"
+FONT=13
+
+# set variables in .gp like this: ## COL=""
+eval $(awk '/^##/ {$1="";print}' $IN)
+
+termopt="$COL size $SIZE lw $LW $FONT"
+
+cd $WD
+prefix="set term post eps enh $termopt; set output \"$OUT\""
+(echo "$prefix"; cat $IN) | gnuplot

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+SAVE=1 python "$@"
+shift
+for x in "$@"; do
+    pdfcrop "$x" "$x.tmp"
+    pdfstrip "$x.tmp" "$x"
+    rm "$x.tmp"
+done
