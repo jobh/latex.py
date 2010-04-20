@@ -1,0 +1,600 @@
+\documentclass{nagauth}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{floatrow}
+\floatsetup[table]{style=plaintop,font=small}
+
+
+
+% microtypography, makes stuff prettier
+% expansion doesn't work with the current combo of fonts+diff
+\usepackage[expansion=false]{microtype}
+
+\usepackage[numbers]{natbib}
+\usepackage{graphicx,subfig}
+\usepackage{amsmath,amssymb}
+\allowdisplaybreaks[1] \usepackage{tikz}
+\usetikzlibrary{snakes,patterns}
+
+\usepackage{booktabs}
+
+
+\usepackage{color}
+\definecolor{dimbg}{gray}{.93}
+\definecolor{dimfg}{gray}{.2}
+\makeatletter\newenvironment{graybox}{  \begin{lrbox}{\@tempboxa}\begin{minipage}{\columnwidth}}{\end{minipage}\end{lrbox}  \colorbox{dimbg}{\usebox{\@tempboxa}}
+}\makeatother
+
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\trace}{Tr}
+
+
+
+
+
+
+\pgfdeclarepatternformonly{inside domain}{\pgfqpoint{-1pt}{-1pt}}{\pgfqpoint{10pt}{10pt}}{\pgfqpoint{9pt}{9pt}}{
+  \pgfsetlinewidth{0.4pt}
+  \pgfpathmoveto{\pgfqpoint{0pt}{0pt}}
+  \pgfpathlineto{\pgfqpoint{9.1pt}{9.1pt}}
+  \pgfusepath{stroke}
+}
+
+\newlength{\fracheight}
+\settoheight{\fracheight}{$\frac{T}{x}$}
+
+
+\date{\today}
+
+
+
+\newsavebox{\mybox}
+\newlength{\myboxlen}
+
+\begin{document}
+
+\NAG{0}{0}{0}{0}{00}
+\runningheads{J.~B.~Haga \emph{et al.}}{Pressure oscillations in low-permeable porous media}
+\noreceived{}\norevised{}\noaccepted{}
+\title{Pressure oscillations and locking in low-permeable and incompressible porous media}
+\author{
+  Joachim Berdal Haga\affil{1}\comma\affil{2}\comma\corrauth,
+  Harald Osnes\affil{1}\comma\affil{2} and
+  Hans Petter Langtangen\affil{1}\comma\affil{3}}
+\address{\affilnum{1}\ Scientific Computing Department, Simula Research Laboratory, Norway\\
+\affilnum{2}\ Department of Mathematics, University of Oslo, Norway\\
+\affilnum{3}\ Department of Informatics, University of Oslo, Norway\\
+{\colorbox{dimbg}{\today{} $\cdot$ 86807b0+}\hspace{-.5ex}}
+}
+\corraddr{J.~B.~Haga, Simula Research Laboratory, 
+PO Box 134, N-1325 Lysaker, Norway. E-mail: jobh@simula.no}
+\cgs{Statoil ASA}
+\cgs{Norwegian Research Council}
+
+\begin{abstract}
+%
+Large-scale simulations of flow in deformable porous media require
+
+We argue that pressure oscillations in low-permeable porous media should be
+understood as a failure to satisfy the inf-sup condition on the finite element
+spaces, rather than as a failure to represent a nearly divergence-free
+displacement solution (locking).
+This understanding makes it possible to use the established library of
+inf-sup-stable elements as a guideline for choosing finite element spaces
+for Biot's equations.
+\end{abstract}
+\keywords{Biot's consolidation; pressure oscillations; elastic locking; low-permeable media; 
+incompressible media; finite elements}
+
+\section{Introduction}
+The locking phenomenon in elasticity is well known to cause spurious
+oscillations in the (solid) pressure and erroneous displacement solutions for
+nearly incompressible materials.
+A similar phenomenon can be seen in poroelasticity when low-permeable regions
+are present.
+In the latter case, oscillations can be observed in the fluid pressure. In
+[ref], Phillips et al.~argue that these phenomena come from the same
+fundamental problem: the reduction of effective degrees of freedom in the
+displacement solution when the finite elements are required to be (nearly)
+divergence-free, $\boldsymbol{\nabla} \cdot \boldsymbol{u}\approx 0$.
+
+In the present paper, we test this hypothesis numerically by employing the
+mixed finite element formulation for the displacement fielt in the poroelastic
+equations.
+Furthermore, we look at ways to overcome the pressure oscillations in
+low-permeable materials without resorting to Discontinuous Galerkin methods
+(which have been shown ito alleviate the problem [ibid.]).
+
+\section{The mathematical model}
+
+The equations describing poroelastic flow and deformation can be derived from
+the principles of conservation of fluid mass and the balance of forces on the
+porous matrix.
+%
+The linear poroelastic equations can, in the small-strains regime, be
+expressed as
+%
+\begin{align}
+\label{eq:sim1}
+S\dot{p_\text{f}} - \boldsymbol{\nabla} \cdot \mathrm{\bf \Lambda} \boldsymbol{\nabla} p_\text{f} + \alpha \boldsymbol{\nabla} \cdot \dot{\boldsymbol{u}} &= q, \\
+\label{eq:sim2}
+\boldsymbol{\nabla} (\lambda+\mu) \boldsymbol{\nabla} \cdot \boldsymbol{u} + \boldsymbol{\nabla} \cdot \mu \boldsymbol{\nabla} \boldsymbol{u}
+ -  \alpha \boldsymbol{\nabla} p_\text{f} &= \boldsymbol{r}.
+\end{align}
+%
+Here, we subsume body forces such as gravitational forces into the right-hand
+side source terms $q$ and $\boldsymbol{r}$.
+The primary variables are $p_\text{f}$ for the fluid pressure and $\boldsymbol{u}$ for the
+displacement of the porous medium, $S$ and $\mathrm{\bf \Lambda}$ are the fluid storage
+coefficient and the flow mobility respectively, $\alpha$ is the Biot-Willis fluid/solid
+coupling coefficient, and $\lambda$ and $\mu$ are the Lam\'e elastic parameters.
+
+The fluid (Darcy) velocity is often of particular interest in poroelastic
+calculations.
+It can be written
+\begin{equation}
+  \label{eq:vD}
+  \boldsymbol{v}_\text{D}= -\mathrm{\bf \Lambda} \boldsymbol{\nabla} p_\text{f},
+\end{equation}
+and represents the net macroscopic flux.
+%
+For the displacement equation, the main secondary quantity of interest is the
+effective stress tensor,
+\begin{align}
+  \label{eq:sigma}
+  \tilde{\mathrm{\bf \sigma}} &= (\alpha p_\text{f} + p_\text{s}) \mathrm{\bf I} +
+  \mu\mathrm{\bf (\boldsymbol{\nabla} \boldsymbol{u} + (\boldsymbol{\nabla} \boldsymbol{u})^{\!\mathsf{T}})},\\
+  \intertext{which is written here using the solid pressure}
+  \label{eq:Ps}
+  p_\text{s} &= -\lambda \boldsymbol{\nabla} \cdot \boldsymbol{u}.
+\end{align}
+
+\subsubsection*{Weak discrete-in-time form.}
+
+We employ a first-order backward finite difference method in time, which leads
+to the discrete-time form of Equation~\eqref{eq:sim1}
+%
+\begin{equation}
+  \label{eq:time1}
+  S p_\text{f} - \Delta t\boldsymbol{\nabla} \cdot \mathrm{\bf \Lambda} \boldsymbol{\nabla} p_\text{f}
+  +  \boldsymbol{\nabla} \cdot \boldsymbol{u} = q\Delta t + S \hat{p_\text{f}} + \boldsymbol{\nabla} \cdot \hat{\boldsymbol{u}}.
+\end{equation}
+%
+where $(\hat{p_\text{f}},\hat{\boldsymbol{u}})$ use values from the previous time step,
+while unmarked variables are taken to be at the current time step.
+
+Next, we rewrite Equations~\eqref{eq:sim2} and~\eqref{eq:time1} in
+weak form, using integration by parts to eliminate second derivatives.
+The following relations must then be satisfied for all test functions $\pi$ and
+$\boldsymbol{\omega}$ in the domain $\Omega$:
+%
+\begin{gather}
+  \label{eq:weakpress}
+  \int_\Omega [
+    \pi(
+  S p_\text{f}
+  + \boldsymbol{\nabla} \cdot \boldsymbol{u})
+  + \Delta t \boldsymbol{\nabla}\pi \cdot \mathrm{\bf \Lambda} \boldsymbol{\nabla} p_\text{f}
+  ] \,\mathrm{d}\Omega 
+  = \int_\Omega \pi[
+    q \Delta t
+  + S \hat{p_\text{f}}
+  + \boldsymbol{\nabla} \cdot \hat{\boldsymbol{u}}] \,\mathrm{d}\Omega
+-\int_\Gamma \pi f_{\boldsymbol{n}}\Delta t \,\mathrm{d}\Gamma,\\
+%
+\label{eq:weakdispl}
+  \int_\Omega [
+  (\boldsymbol{\nabla}\cdot\boldsymbol{\omega})((\lambda+\mu)(\boldsymbol{\nabla}\cdot\boldsymbol{u})
+  -\alpha p_\text{f})
+  +\boldsymbol{\nabla} \boldsymbol{\omega} : \mu  \boldsymbol{\nabla} \boldsymbol{u}
+  ] \,\mathrm{d}\Omega =
+ - \int_\Omega \boldsymbol{\omega} \cdot \boldsymbol{r} \,\mathrm{d}\Omega + \int_\Gamma \boldsymbol{\omega}
+  \cdot \boldsymbol{t}_{\boldsymbol{n}} \,\mathrm{d}\Gamma.
+\end{gather}
+%
+The normal flux $f_{\boldsymbol{n}}=\boldsymbol{v}_\text{D}\cdot\boldsymbol{n}$ and normal stress $\boldsymbol{t}_{\boldsymbol{n}}$ on the boundary
+$\Gamma$ appear here as natural boundary conditions. 
+The discrete finite element approximation follows from solving
+Equations~\eqref{eq:weakpress} and~\eqref{eq:weakdispl} in finite-dimensional spaces.
+
+\subsection{Mixed fluid pressure-velocity formulation}
+
+In many applications of the poroelastic equations, we are mainly interested in
+the flow of the fluid through the medium.
+However, due to the differential operator acting on $p_\text{f}$ it is of lower accuracy than
+the pressure $p_\text{f}$ itself.
+Furthermore, the derivative is not continuous between elements, and hence the
+fluid mass is not conserved.
+A natural extension is then to introduce $\boldsymbol{v}_\text{D}$ as an extra primary variable in a mixed
+finite element formulation.
+The order of accuracy is higher, and continuous elements for $\boldsymbol{v}_\text{D}$ ensure mass
+conservation.
+
+By inserting Equation~\eqref{eq:vD} into Equation~\eqref{eq:sim1}, we get a coupled system of three
+equations (of which two are vector equations). Equation~\eqref{eq:sim2} for solid
+displacement is unchanged, and the equations for fluid flux and pressure are
+\begin{align}
+\label{eq:simp1}
+S\dot{p_\text{f}} + \boldsymbol{\nabla} \cdot \boldsymbol{v}_\text{D} + \alpha \boldsymbol{\nabla} \cdot \dot{\boldsymbol{u}} &= q, \\
+\label{eq:simp2}
+  \mathrm{\bf \Lambda}^{-1} \boldsymbol{v}_\text{D} + \boldsymbol{\nabla} p_\text{f} &= 0.
+\end{align}
+We shall call this the mixed fluid pressure, or mixed-$p_\text{f}$, formulation.
+
+\subsubsection*{Weak discrete-in-time form.}
+
+Following the same conventions as in the previous section, Equation~\eqref{eq:weakpress}
+becomes the two coupled equations
+\begin{gather}
+  \label{eq:weakpressmix}
+  \int_\Omega \pi[
+  S p_\text{f} +
+  \Delta t \boldsymbol{\nabla} \cdot \boldsymbol{v}_\text{D}
+  + \boldsymbol{\nabla} \cdot \boldsymbol{u}
+  ] \,\mathrm{d}\Omega 
+  = \int_\Omega \pi[
+  q \Delta t
+  + S \hat{p_\text{f}}
+  + \boldsymbol{\nabla} \cdot \hat{\boldsymbol{u}}] \,\mathrm{d}\Omega,\\
+%
+\label{eq:weakdarcy}
+  \int_\Omega [
+  \boldsymbol{\phi} \cdot \mathrm{\bf \Lambda}^{-1}\boldsymbol{v}_\text{D} - (\boldsymbol{\nabla} \cdot \boldsymbol{\phi})p_\text{f}
+  ]  \,\mathrm{d}\Omega
+  + \int_\Gamma (\boldsymbol{\phi}\cdot \boldsymbol{n}) p_\text{f} = 0,
+\end{gather}
+for any test functions $\pi$ and $\boldsymbol{\phi}$ in the appropriate spaces.
+The integration by parts in Equation~\eqref{eq:weakdarcy} is undertaken to avoid
+taking the derivative of $p_\text{f}$, which is usually of low order (and possibly
+piecewise constant).
+
+\subsection{Mixed solid displacement-pressure formulation}
+
+In the field of (pure) elasticity, it is well understood that a
+low-compressible material (with Poisson's ratio close to $0.5$) leads to
+unphysical oscillations in the solid pressure field, and in some cases also to
+a wrong solution for the calculated displacement.
+This can be explained by $\lambda$ becoming very large in Equation~\eqref{eq:sim2}, leading to
+the requirement that $\boldsymbol{\nabla}\cdot\boldsymbol{u}\rightarrow 0$.
+When this requirement is applied to standard finite elements, several degrees
+of freedom become ``locked'', leaving too few degrees of freedom to represent
+the correct solution.
+
+One way to overcome this obstacle is to introduce a new primary variable for
+the solid pressure, which is defined in Equation~\eqref{eq:Ps}.
+Equation~\eqref{eq:sim2} can then be rewritten as two coupled equations,
+\begin{align}
+\label{eq:mixu1}
+\boldsymbol{\nabla} \mu \boldsymbol{\nabla} \cdot \boldsymbol{u} + \boldsymbol{\nabla} \cdot \mu \boldsymbol{\nabla} \boldsymbol{u}
+ - \boldsymbol{\nabla} p_\text{s} - \alpha \boldsymbol{\nabla} p_\text{f} &= \boldsymbol{r},\\
+\label{eq:mixu2}
+\lambda^{-1}p_\text{s}+\boldsymbol{\nabla}\cdot\boldsymbol{u} &= 0,
+\end{align}
+and combined with either Equation~\eqref{eq:sim1} or with Equations~\eqref{eq:simp1} and~\eqref{eq:simp2}.
+In either case, we replace $\alpha \boldsymbol{\nabla} \cdot \dot{\boldsymbol{u}}$ by $- \alpha
+\lambda^{-1} \dot{p_\text{s}}$; the reason for this change will be elucidated in later
+sections.
+The mixed solid displacement, or mixed-$\boldsymbol{u}$, formulation is stable for
+low-compressible or even incompressible materials.
+
+\subsubsection*{Weak discrete-in-time form.}
+
+The weak form of Equations~\eqref{eq:mixu1}--\eqref{eq:mixu2} is
+\begin{gather}
+  \label{eq:weakpressmix2}
+  \int_\Omega [\pi(
+  S p_\text{f}
+  - \lambda^{-1} p_\text{s})
+  + \Delta t \boldsymbol{\nabla}\pi \cdot \mathrm{\bf \Lambda} \boldsymbol{\nabla} p_\text{f}
+  ] \,\mathrm{d}\Omega 
+  = \int_\Omega \pi[
+   q \Delta t
+  + S \hat{p_\text{f}}
+  - \lambda^{-1} \hat{p_\text{s}}] \,\mathrm{d}\Omega
+-\int_\Gamma \pi f_{\boldsymbol{n}}\Delta t \,\mathrm{d}\Gamma,\\
+%
+\label{eq:weakdisplmix}
+  \int_\Omega [
+  (\boldsymbol{\nabla}\cdot\boldsymbol{\omega})(\mu(\boldsymbol{\nabla}\cdot\boldsymbol{u})
+  -\alpha p_\text{f} - p_\text{s})
+  +\boldsymbol{\nabla} \boldsymbol{\omega} : \mu  \boldsymbol{\nabla} \boldsymbol{u}
+  ]  \,\mathrm{d}\Omega = - \int_\Omega \boldsymbol{\omega} \cdot \boldsymbol{r} \,\mathrm{d}\Omega + \int_\Gamma \boldsymbol{\omega}
+  \cdot \boldsymbol{t}_{\boldsymbol{n}} \,\mathrm{d}\Gamma,\\
+%
+\label{eq:weaks}
+  \int_\Omega \psi[
+     \lambda^{-1}p_\text{s} + \boldsymbol{\nabla} \cdot \boldsymbol{u} 
+  ]  \,\mathrm{d}\Omega
+  = 0,
+\end{gather}
+for test functions $\pi$, $\boldsymbol{\omega}$ and $\psi$ in the appropriate spaces.
+Finally, the trailing term on both sides of Equation~\eqref{eq:weakpressmix2} can be replaced in the
+same way as in Equations~\eqref{eq:weakpressmix}--\eqref{eq:weakdarcy} to produce a doubly mixed
+system of two vector unknowns and two scalar unknowns.
+
+\section{On the cause of pressure oscillations}
+
+\subsection{Is it caused by locking?}
+
+It is well known that spurious pressure oscillations may occur in low-permeable
+regions in finite element calculations of the poroelastic equations [ref].
+Phillips et al.~[ref] argue that the cause of these pressure oscillations 
+is caused by the phenomenon known as \emph{locking} in pure elasticity.
+Elastic locking appears when finite elements are asked to reproduce a
+displacement field that is nearly divergence free, as
+$\lambda\rightarrow\infty$ in Equation~\eqref{eq:sim2} leads to $\boldsymbol{\nabla}\cdot\boldsymbol{u}\rightarrow 0$.
+Satisfying this with standard finite elements locks out many of the degrees of
+freedom, in some cases to the extent that only (nearly) constant displacement
+fields can be represented.
+More commonly, the error in displacement is seen as nonphysical oscillations in
+the stress field (i.e., the components of $\boldsymbol{\nabla}\boldsymbol{u}$).
+
+The argument by Phillips et al.~[] is that the same happens in poroelasticity,
+in some conditions.
+Consider Equation~\eqref{eq:sim1} with constant permeability, discretised in time with time
+step $\Delta t$ and with $S=q=0$.
+Assume furthermore that we take one time step from a divergence-free initial
+state, which is quite normal at the start of a simulation (when $\boldsymbol{u}=0$).
+Then, Equation~\eqref{eq:sim1} reduces to
+\begin{equation}
+  \boldsymbol{\nabla}\cdot\boldsymbol{u} \approx \epsilon \nabla^2 p_\text{f},
+\end{equation}
+with $\epsilon=\Delta t \lVert\mathrm{\bf \Lambda}\rVert / \alpha$.
+The right-hand side becomes very small for short time steps and low permeabilities.
+Again, we see the appearance of the requirement for a nearly divergence-free
+solution for the displacement $\boldsymbol{u}$.
+
+There are, however, some differences.
+We illustrate these through an example where both kinds of problem are present: A
+low-permeable region ($\mathrm{\bf \Lambda}\rightarrow 0$) and a low-compressible region
+($\lambda\rightarrow\infty$).
+This example is shown in Figure~\ref{fig:domain}.
+The top layer is low-compressible, with $\lambda=\epsilon^{-1}$ for some $\epsilon<1$; the middle
+layer is low-permeable, with $\mathrm{\bf \Lambda}=\epsilon\mathrm{\bf I}$; while the bottom layer
+has unit permeability and compressibility.
+The boundary conditions at the sides and bottom are
+\begin{align*}
+  \boldsymbol{u}\cdot\boldsymbol{n}&=0,\\
+  \boldsymbol{f}_{\boldsymbol{n}}&=0,\\
+\intertext{while the top boundary has boundary conditions}
+p_\text{f}&=0,\\
+\boldsymbol{t}_{\boldsymbol{n}}&=F.
+\end{align*}
+
+\begin{figure}
+\ffigbox[\FBwidth]
+{\includegraphics[]{data/domain}}
+{\caption{{\bf\tiny[domain] }The test domain. On the sides and bottom, no-flux conditions are
+  imposed so that no fluid or solid movement is allowed in the normal
+  direction. The top is drained with fluid pressure $p_\text{f}=0$ and an applied normal
+  stress (load).}\label{fig:domain}}
+\end{figure}
+
+We use this test problems with two different choices of load $F$: Constant load
+across the whole boundary, and load on just the right half.
+To evaluate the numerical solutions, we use the fact that the total volumetric
+effective stress,
+\begin{equation}
+\frac{\trace{\tilde{\sigma}}}{3} = p_\text{s} + \alpha p_\text{f} + 2\mu \boldsymbol{\nabla}\cdot\boldsymbol{u},
+\end{equation}
+should be continuous, smooth and monotonically non-increasing from top to bottom
+under simple loading conditions. The correct solutions are shown in
+Figure~\ref{fig:symm/Q0,RT1,Q1,-} for constant load and Figure~\ref{fig:asymm/Q0,RT1,CR1,Q0} for
+non-constant load.
+This does \emph{not} ensure that the numerical solution converges, but it is easy to
+identify oscillatory solutions.
+For small $\epsilon$, the load is balanced initially (in the top layer) by
+solid pressure; then the fluid pressure takes over in the middle layer; and
+finally, in the bottom layer, a combination of fluid/solid pressure and
+volumetric strain takes the load.
+
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[$\epsilon=10^{-1}$]{\label{fig:symm/Q0,RT1,Q1,-:a}\includegraphics[width=.29\textwidth]{data/symm/Q0,RT1,Q1,-,EPS-1}}
+\subfloat[$\epsilon=10^{-4}$]{\label{fig:symm/Q0,RT1,Q1,-:b}\includegraphics[width=.29\textwidth]{data/symm/Q0,RT1,Q1,-,EPS-4}}
+\subfloat[$\epsilon=10^{-14}$]{\label{fig:symm/Q0,RT1,Q1,-:c}\includegraphics[width=.29\textwidth]{data/symm/Q0,RT1,Q1,-,EPS-14}}
+}
+{\caption{{\bf\tiny[symm/Q0,RT1,Q1,-] }Correct solution for the constant-load problem.}\label{fig:symm/Q0,RT1,Q1,-}}
+\end{figure}
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[$\epsilon=10^{-1}$]{\label{fig:asymm/Q0,RT1,CR1,Q0:a}\includegraphics[width=.29\textwidth]{data/asymm/Q0,RT1,CR1,Q0,EPS-1}}
+\subfloat[$\epsilon=10^{-4}$]{\label{fig:asymm/Q0,RT1,CR1,Q0:b}\includegraphics[width=.29\textwidth]{data/asymm/Q0,RT1,CR1,Q0,EPS-4}}
+\subfloat[$\epsilon=10^{-14}$]{\label{fig:asymm/Q0,RT1,CR1,Q0:c}\includegraphics[width=.29\textwidth]{data/asymm/Q0,RT1,CR1,Q0,EPS-14}}
+}
+{\caption{{\bf\tiny[asymm/Q0,RT1,CR1,Q0] }Correct solution for the variable-load problem.}\label{fig:asymm/Q0,RT1,CR1,Q0}}
+\end{figure}
+
+[The following is an outline of the argument / evidence. To be filled in with prose.]
+\begin{itemize}
+\item Elastic locking appears when there is rotation [ref for this?]. Pressure oscillations
+  occurs even in the absence of rotation. See
+  Figure~\ref{fig:symm/Q1,-,Q1,-,EPS-14:asymm/Q1,-,Q1,-,EPS-14}.
+\item If elastic locking is the cause of pressure oscillations, it should be
+  cured by the mixed-$\boldsymbol{u}$ formulation. But mixed-$\boldsymbol{u}$ only removes the
+  oscillations in the top (incompressible) layer, not in the middle
+  (impermeable) layer. See Figure~\ref{fig:asymm/P2,-,P2,-,EPS-14:asymm/P2,-,P2+,P1-,EPS-14}. This is
+  probably the most powerful argument.
+\item The impermeable layer does \emph{not} force $\boldsymbol{u}$ towards a constant. The
+  incompressible layer does. See Figure~\ref{fig:u-locking}. Hence, locking is present
+  in the incompressible but not in the impermeable layer.
+\end{itemize}
+
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[{\bf\tiny[symm/Q1,-,Q1,-,EPS-14] }Constant load]%
+{\label{fig:symm/Q1,-,Q1,-,EPS-14}\includegraphics[width=.45\textwidth]{data/symm/Q1,-,Q1,-,EPS-14}}
+\subfloat[{\bf\tiny[asymm/Q1,-,Q1,-,EPS-14] }Variable
+  load]%
+{\label{fig:asymm/Q1,-,Q1,-,EPS-14}\includegraphics[width=.45\textwidth]{data/asymm/Q1,-,Q1,-,EPS-14}}
+}
+{\caption{Pressure oscillations even with constant load. $\epsilon=10^{-14}$}\label{fig:symm/Q1,-,Q1,-,EPS-14:asymm/Q1,-,Q1,-,EPS-14}}
+\end{figure}
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[{\bf\tiny[asymm/P2,-,P2,-,EPS-14] }Not
+  mixed]%
+{\label{fig:asymm/P2,-,P2,-,EPS-14}\includegraphics[width=.45\textwidth]{data/asymm/P2,-,P2,-,EPS-14}}
+\subfloat[{\bf\tiny[asymm/P2,-,P2+,P1-,EPS-14] }Mixed-$\boldsymbol{u}$]%
+{\label{fig:asymm/P2,-,P2+,P1-,EPS-14}\includegraphics[width=.45\textwidth]{data/asymm/P2,-,P2+,P1-,EPS-14}}
+}
+{\caption{Mixed displacement only
+  effective for incompressible region. $\epsilon=10^{-14}$}\label{fig:asymm/P2,-,P2,-,EPS-14:asymm/P2,-,P2+,P1-,EPS-14}}
+\end{figure}
+\begin{figure}
+\ffigbox[\FBwidth]
+{\includegraphics[width=0.5\textwidth]{data/u-locking}}
+{\caption{{\bf\tiny[u-locking] }Locking in $\boldsymbol{u}_z$ (red) vs.~non-locking
+  (green). Notice the nearly constant displacement in the top layer. $\epsilon=10^{-14}$}\label{fig:u-locking}}
+\end{figure}
+
+The evidence points to pressure oscillations not being caused by locking due to
+divergence-free $\boldsymbol{u}$.
+
+\section{Is it caused by incompatible finite element spaces (in the inf-sup sense)?}
+
+We introduce here the hypothesis that the pressure oscillations are caused by a
+failure of the finite element spaces in the coupled system to fulfill the
+Babuska-Brezzi [ref] inf-sup condition.
+This is inspired by the similar roles that $p_\text{f}$ and $p_\text{s}$ play in relation to
+$\boldsymbol{u}$.
+In regular elasticity (not poroelasticity), the introduction of a solid
+pressure field is mandatory when incompressible materials are modelled
+($\nu=0.5$, $\lambda\rightarrow\infty$).
+This leads to a saddle-point problem which must fulfill the Babuska-Brezzi
+conditions; these conditions lead to restrictions on the finite element spaces
+that are used.
+With constant material parameters for simplicity, this system reads as
+\begin{align}
+  \mu \boldsymbol{\nabla} \boldsymbol{\nabla} \cdot \boldsymbol{u} + \mu \nabla^2 \boldsymbol{u} - \boldsymbol{\nabla} p_\text{s} &= \boldsymbol{r}\\
+  \boldsymbol{\nabla} \cdot \boldsymbol{u} &= 0.
+\end{align}
+Compare this with the poroelastic equations with impermeable materials,
+$\epsilon\rightarrow 0$.
+Under the conditions of $S=q=\boldsymbol{\nabla}\cdot\hat{\boldsymbol{u}}=0$, either of
+Equation~\eqref{eq:sim1} (with $\mathrm{\bf \Lambda}\rightarrow 0$), or Equation~\eqref{eq:simp1} (with
+$\boldsymbol{v}_\text{D}\rightarrow 0$ lead to the same set of equations (except for a factor in
+the first term),
+\begin{align}
+(\lambda+\mu) \boldsymbol{\nabla} \boldsymbol{\nabla} \cdot \boldsymbol{u} + \mu \nabla^2 \boldsymbol{u} - \boldsymbol{\nabla} p_\text{f} &= \boldsymbol{r}\\
+\boldsymbol{\nabla} \cdot \boldsymbol{u} &= 0
+\end{align}
+
+It is well known that only combinations of element spaces that satisfy the
+inf-sup condition are stable for the $\boldsymbol{u}$-$p_\text{s}$ system.
+We shall present experimental evidence showing that the fluid pressure
+oscillations are similar to the solid pressure oscillations that occur when the
+inf-sup condition is violated.
+Furthermore, we will show that using combinations of elements that are known to
+be stable for Poisson and Stokes type problems, the oscillations disappear.
+This continues in the following section, where we show the
+convergence of some of these elements.
+
+[Again, I just the outline of the arguments.]
+
+\begin{itemize}
+\item Intentional violation of the inf-sup condition for $\boldsymbol{u}$-$p_\text{s}$ shows similar oscillations in the
+  low-compressible region. [Argument from superficially similar symptoms is a
+  weak one, I know, but still...]. This happens even in
+  the absence of rotation, where ``normal'' displacement locking does not
+  occur. See Figure~\ref{fig:symm/Q2,-,Q2,-,EPS-14:symm/Q2,-,Q2,Q2,EPS-14}.
+\item Lowering the order of $p_\text{f}$ and $p_\text{s}$ removes oscillations in both
+  layers. This is consistent with the current hypothesis, but not with the locking
+  hypothesis, since we do not introduce more degrees of freedom in $\boldsymbol{u}$. See
+  Figure~\ref{fig:symm/Q1,-,Q2,Q1-,EPS-14:symm/Q1-,Q2,Q2,Q1-,EPS-14}.
+\item The present hypothesis (if correct) is good news, since the Discontinuous
+  Galerkin method used by Phillips et al.~is computationally expensive. We can use first order
+  Rannacher-Turek or Crouzeix-Raviart for displacement in combination with
+  Raviart-Thomas for fluid velocity and piecewise constant pressure, or linear
+  pressure with enriched (bubble) linear elements for displacement.
+\end{itemize}
+
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[{\bf\tiny[symm/Q2,-,Q2,-,EPS-14] }Non-mixed]%
+{\label{fig:symm/Q2,-,Q2,-,EPS-14}\includegraphics[width=.45\textwidth]{data/symm/Q2,-,Q2,-,EPS-14}}
+\subfloat[{\bf\tiny[symm/Q2,-,Q2,Q2,EPS-14] }Mixed-$\boldsymbol{u}$, with
+  intentional inf-sup violation for $\boldsymbol{u}$-$p_\text{s}$]%
+{\label{fig:symm/Q2,-,Q2,Q2,EPS-14}\includegraphics[width=.45\textwidth]{data/symm/Q2,-,Q2,Q2,EPS-14}}
+}
+{\caption{}\label{fig:symm/Q2,-,Q2,-,EPS-14:symm/Q2,-,Q2,Q2,EPS-14}}
+\end{figure}
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[{\bf\tiny[symm/Q1,-,Q2,Q1-,EPS-14] }Mixed-$\boldsymbol{u}$]%
+{\label{fig:symm/Q1,-,Q2,Q1-,EPS-14}\includegraphics[width=.45\textwidth]{data/symm/Q1,-,Q2,Q1-,EPS-14}}
+\subfloat[{\bf\tiny[symm/Q1-,Q2,Q2,Q1-,EPS-14] }Mixed-both]%
+{\label{fig:symm/Q1-,Q2,Q2,Q1-,EPS-14}\includegraphics[width=.45\textwidth]{data/symm/Q1-,Q2,Q2,Q1-,EPS-14}}
+}
+{\caption{Apparently
+  correct solutions. When we introduce the mixed formulation also for the fluid
+pressure/velocity, we can use discontinuous elements for $p_\text{f}$. These can better
+approximate the very steep gradients at the layer interfaces, and thus avoid
+the spikes there.}\label{fig:symm/Q1,-,Q2,Q1-,EPS-14:symm/Q1-,Q2,Q2,Q1-,EPS-14}}
+\end{figure}
+
+
+\section{Convergence testing}
+
+[In this section, we study the convergence of some selected combinations of
+  element spaces on the Barry-Mercer problem. Need to make a list of relevant
+  elements.]
+
+The Barry-Mercer problem, analysed in [ref], is illustrated in [todo figure ?].
+It consists of a pulsating pressure point source within a square
+two-dimensional domain of constant material parameters.
+The boundary conditions are chosen to allow an analytical solution:
+\begin{align*}
+  p_\text{f} &= 0, \\
+  \boldsymbol{u} \times \boldsymbol{n} &= 0\\
+\intertext{at the sides, and the point source located at $\boldsymbol{x}_0$ is given as}
+q(\boldsymbol{x},t) &= p_0 \delta(\boldsymbol{x}-\boldsymbol{x}_0) \sin t.
+\end{align*}
+
+It has been demonstrated [ref] that the Barry-Mercer problem exhibits pressure
+oscillations for early times when $\epsilon=\lVert\mathrm{\bf \Lambda}\rVert \Delta t \ll 1$.
+To see this, we look at the first time step on the unit square, with $\Delta
+t=10^{-2}$, $\mathrm{\bf \Lambda}=10^{-14}\mathrm{\bf I}$, $p_0=1$ and $\boldsymbol{x}_0=(0.25,0.25)$.
+This combination of parameters induces severe oscillations in the numerical
+solution when the mixed-$p_\text{f}$ formulation with first order Raviart-Thomas
+elements is used for the fluid and bilinear elements are used for the displacement.
+Figure~\ref{fig:barry-mercer/Q0,RT1,Q1,-,EPS-14:barry-mercer/Q0,RT1,CR1,-,EPS-14} shows
+how a minor change, switching the $\boldsymbol{u}$ finite element from conforming bilinear
+to nonconforming bilinear (Rannacher-Turek elements) removes the pressure
+oscillations.
+
+\begin{figure}
+\ffigbox[]
+{
+\subfloat[{\bf\tiny[barry-mercer/Q0,RT1,Q1,-,EPS-14] }a]%
+{\label{fig:barry-mercer/Q0,RT1,Q1,-,EPS-14}\includegraphics[width=.45\textwidth]{data/barry-mercer/Q0,RT1,Q1,-,EPS-14}}
+\subfloat[{\bf\tiny[barry-mercer/Q0,RT1,CR1,-,EPS-14] }b]%
+{\label{fig:barry-mercer/Q0,RT1,CR1,-,EPS-14}\includegraphics[width=.45\textwidth]{data/barry-mercer/Q0,RT1,CR1,-,EPS-14}}
+}
+{\caption{}\label{fig:barry-mercer/Q0,RT1,Q1,-,EPS-14:barry-mercer/Q0,RT1,CR1,-,EPS-14}}
+\end{figure}
+
+\section{Concluding remarks}
+
+
+
+\acks
+
+
+\bibliography{../references}
+\bibliographystyle{wileyj}
+
+\end{document}
+
+
+%% Local Variables:
+%% mode: LaTeX
+%% End:
+

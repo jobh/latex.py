@@ -56,7 +56,6 @@
 
 \python
 {%@
-@formatted
 def fig(name, caption, width=''):
     :\begin{figure}
     :\ffigbox[\FBwidth]
@@ -67,7 +66,6 @@ def fig(name, caption, width=''):
 
 \python
 {%@
-@formatted
 def twofig(name1, cap1, name2, cap2, cap_both, cap_width=''):
     :\begin{figure}
     :\ffigbox[#(cap_width)]
@@ -83,7 +81,6 @@ def twofig(name1, cap1, name2, cap2, cap_both, cap_width=''):
 
 \python
 {%@
-@formatted
 def allfig(name, caption, cap_width=''):
     :\begin{figure}
     :\ffigbox[#(cap_width)]
@@ -154,7 +151,6 @@ def version():
 \newlength{\myboxlen}
 \python
 {%@
-@formatted
 def capbox(caption, width, adj='-1ex'):
     :\sbox{\mybox}{width}
     :\settowidth{\myboxlen}{\usebox{\mybox}}

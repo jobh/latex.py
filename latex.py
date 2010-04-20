@@ -225,7 +225,11 @@ def glob_scope():
 
 ########## Used by the @out definitions (see above) ###############
 pending_output = []
-current_kwargs = {}
+def pop_pending_output():
+    global pending_output
+    ret = '\n'.join(pending_output)
+    pending_output = []
+    return ret
 
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
 def format(s):
@@ -234,30 +238,14 @@ def format(s):
     s = replace_re.sub(replace_with, s)
     return s
 
-def _(strs, do_format=True, local_args=None):
+def _(strs, local_args=None):
     if strs:
-        global pending_output, current_kwargs
-        if local_args:
-            current_kwargs.update(local_args)
+        global pending_output
         if type(strs) is str:
             strs = [strs.strip().lstrip()]
-        if do_format:
-            strs = [format(s) % current_kwargs for s in strs]
+        if local_args:
+            strs = [format(s) % local_args for s in strs]
         pending_output.extend(strs)
-
-def formatted(func):
-    varnames = func.func_code.co_varnames[:func.func_code.co_argcount]
-    defaults = func.func_defaults
-    def func_wrapper(*args):
-        global current_kwargs, pending_output
-        n_defaults = len(varnames)-len(args)
-        if n_defaults > 0:
-            args = args + defaults[-n_defaults:]
-        current_kwargs = dict(zip(varnames, args))
-        pending_output = []
-        # If the function returns anything, return that instead
-        return func(*args) or '\n'.join(pending_output)
-    return func_wrapper
 ###################################################################
 
 # Return one argument, formatted as a python string.
@@ -328,7 +316,7 @@ def exec_block(lines):
     exec(lines, glob_scope(), parser_scope)
 
 def parse(inf_name):
-    global args, parser_scope, pending_output
+    global args, parser_scope
 
     output = []
     lines = ''
@@ -353,12 +341,10 @@ def parse(inf_name):
                 consuming = False
                 exec_block(lines)
                 lines = ''
-                if pending_output and args.output:
-                    output.append('\n'.join(pending_output))
-                    pending_output = []
+                l = pop_pending_output()
             else:
                 lines += fixup_line(l);
-            continue
+                continue
 
         # Handle %@ lines. We need to save up a full block before exec'ing.
         if l.startswith(args.block_prefix):
@@ -367,9 +353,7 @@ def parse(inf_name):
         elif lines:
             exec_block(lines)
             lines = ''
-            if pending_output and args.output:
-                output.append('\n'.join(pending_output))
-                pending_output = []
+            collected = pop_pending_output()
 
         if collected:
             l = collected+l
@@ -426,6 +410,8 @@ def parse(inf_name):
                         # by calling parser_scope['func'] instead of func.
                         eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
                     result = eval(eval_str, glob_scope(), parser_scope) or args.dummy
+                    if pending_output:
+                        result = pop_pending_output()
                     if args.verbose >= 3:
                         print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
                         print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
