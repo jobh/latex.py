@@ -215,7 +215,7 @@ class args:
     dummy        = '{__}'
     pattern      = r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]'
 
-parser_scope = {'_args': args}
+parser_scope = {}
 
 def glob_scope():
     global parser_scope
@@ -238,14 +238,17 @@ def format(s):
     s = replace_re.sub(replace_with, s)
     return s
 
-def _(strs, local_args=None):
+def _(strs, local_args=None, append=True):
     if strs:
         global pending_output
         if type(strs) is str:
             strs = [strs.strip().lstrip()]
         if local_args:
             strs = [format(s) % local_args for s in strs]
-        pending_output.extend(strs)
+        if (append):
+            pending_output.extend(strs)
+        else:
+            return '\n'.join(strs)
 ###################################################################
 
 # Return one argument, formatted as a python string.
@@ -285,8 +288,9 @@ def consume_args(l):
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
-    (re.compile(r'^(\w+)\s+='), r'parser_scope[r"\1"] ='),   # reserved word?
-    (re.compile(r'^(\s+):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
+    (re.compile(r'^(\w+)\s*='), r'parser_scope[r"\1"] ='),   # reserved word?
+    (re.compile(r'^(\s*):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
+    (re.compile(r'^(\w+)\s*:\s*(\S.*)$'), r'\1 = _(r"\2", local_args=locals(), append=False)'),
     ]
 
 def fixup_line(l):
@@ -409,17 +413,19 @@ def parse(inf_name):
                         # The definition is a function. Protect reserved words
                         # by calling parser_scope['func'] instead of func.
                         eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
-                    result = eval(eval_str, glob_scope(), parser_scope) or args.dummy
+                    try:
+                        result = eval(eval_str, glob_scope(), parser_scope) or args.dummy
+                    except StopIteration:
+                        result = escape(current_match, 1)
                     if pending_output:
-                        result = pop_pending_output()
+                        result = pop_pending_output() + '\n' + result
                     if args.verbose >= 3:
                         print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
                         print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
                         print >>args.errf, prefix2,'>>>',eval_str,'==> """%s"""'%result
                 except Exception,e:
-                    if type(e) is StopIteration: severity = 3
-                    elif type(e) is KeyError:    severity = 2
-                    else:                        severity = 1
+                    if type(e) is KeyError and e.args[0]==comm: severity = 2
+                    else:                                       severity = 1
 
                     if args.verbose >= severity:
                         print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
@@ -569,7 +575,7 @@ def latex_input(name):
     lines = map(escape, lines)
     return ''.join(lines)
 
-LATEX_ARGS={}
+LATEX_ARGS={'environment': []}
 def latex_usepackage(names, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
@@ -582,6 +588,13 @@ def latex_documentclass(name, opt=None):
     LATEX_ARGS['documentclass'] = [name]+opt
     ignore()
 
+def latex_begin(name, *args):
+    LATEX_ARGS['environment'].append(name)
+    ignore()
+def latex_end(name):
+    LATEX_ARGS['environment'].pop()
+    ignore()
+
 def set_latex_parse_mode():
     global args, parser_scope
     parser_scope['newcommand']    = latex_newcommand
@@ -589,6 +602,8 @@ def set_latex_parse_mode():
     parser_scope['input']         = latex_input
     parser_scope['usepackage']    = latex_usepackage
     parser_scope['documentclass'] = latex_documentclass
+    parser_scope['begin']         = latex_begin
+    parser_scope['end']           = latex_end
     args.verbose = 1
     args.macro_prefix = '\\'
 ############################################################################
