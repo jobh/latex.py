@@ -200,7 +200,16 @@ import re
 
 
 ########## Global variables ###############################
+parser_scope = {}
+parser_scope['parser_scope'] = parser_scope
+def macro(s):
+    def wrap(f):
+        global parser_scope
+        parser_scope[s] = f
+        return f
+    return wrap
 
+@macro('_args')
 class args:
     __init__     = None         # disallow instantiation
     build_type   = None
@@ -214,15 +223,6 @@ class args:
     escape       = '{_}'
     dummy        = '{__}'
     pattern      = r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]'
-
-parser_scope = {}
-
-# Compensate for lack of access to nested scopes in eval/exec
-def glob_scope():
-    global parser_scope
-    scope = globals().copy()
-    scope.update(parser_scope)
-    return scope
 
 ########## Used by the @out definitions (see above) ###############
 pending_output = []
@@ -239,7 +239,8 @@ def format(s):
     s = replace_re.sub(replace_with, s)
     return s
 
-def _(strs, local_args=None, append=True):
+@macro('_')
+def output(strs, local_args=None, append=True):
     if strs:
         global pending_output
         if isinstance(strs, str):
@@ -306,6 +307,7 @@ def comment_idx(l):
     cmatch = re.search(r'[^\\]%', l)
     return cmatch and cmatch.start()+1
 
+@macro('_escape')
 def escape(line, count=-1):
     global args
     return line.replace(args.macro_prefix, args.escape, count)
@@ -332,7 +334,7 @@ def exec_block(lines):
     if args.verbose >= 3:
         debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
         args.errf.write(debuglines);
-    exec(lines, glob_scope(), parser_scope)
+    exec(lines, parser_scope)
 
 def parse(inf_name):
     global args, parser_scope
@@ -420,9 +422,7 @@ def parse(inf_name):
 
                     l_in_macro = l[match.start():match.start()+len_of_match]
 
-                    # Gah. Early binding bites. Avoid rebinding the list.
-                    current_match = parser_scope.setdefault('current_match', [])
-                    current_match[:] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
+                    parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
 
                     if isinstance(comm_obj, str):
                         # The definition is a format string
@@ -432,7 +432,7 @@ def parse(inf_name):
                         # by calling parser_scope['func'] instead of func.
                         eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
                     try:
-                        result = eval(eval_str, glob_scope(), parser_scope) or args.dummy
+                        result = eval(eval_str, parser_scope) or args.dummy
                     except StopIteration:
                         result = escape(l_in_macro, 1)
                     if pending_output:
@@ -574,7 +574,6 @@ def latex_renewcommand(name, definition=None):
     return latex_newcommand(name, definition)
 
 def latex_input(name):
-    global parser_scope
     lines = parse(name+'.tex')
     if lines:
         lines[-1] = lines[-1].strip()
@@ -582,24 +581,26 @@ def latex_input(name):
     lines = map(escape, lines)
     return ''.join(lines)
 
-LATEX_ARGS={'environment': []}
+_latex = {'environment': []}
+parser_scope['_latex'] = _latex
+
 def latex_usepackage(names, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
     for name in names.split(','):
-        LATEX_ARGS[name] = opt
+        _latex[name] = opt
     ignore()
 def latex_documentclass(name, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
-    LATEX_ARGS['documentclass'] = [name]+opt
+    _latex['documentclass'] = [name]+opt
     ignore()
 
 def latex_begin(name, *args):
-    LATEX_ARGS['environment'].append(name)
+    _latex['environment'].append(name)
     ignore()
 def latex_end(name):
-    LATEX_ARGS['environment'].pop()
+    _latex['environment'].pop()
     ignore()
 
 def set_latex_parse_mode():
@@ -637,6 +638,7 @@ def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
 ##########################################################################
 
+@macro('_ignore')
 def ignore(*args):
     if len(args) == 1 and hasattr(args[0], '__call__'):
         func = args[0]
@@ -647,7 +649,9 @@ def ignore(*args):
     else:
         raise StopIteration
 
+@macro('is_sentence_start')
 def is_sentence_start():
+    global parser_scope
     b = parser_scope['current_match'][0]
     if re.search(r'[^:.\s]\s*$', b):
         return False
@@ -658,9 +662,8 @@ def is_sentence_start():
 # Command-line invocation
 ##########################################################################
 
-
 def parse_args():
-    global args, parser_scope
+    global args
 
     if len(sys.argv) <= 1:
         print(__doc__)
@@ -742,3 +745,25 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    builtin_macros = []
+    builtin_hidden = []
+    macros = []
+    hidden = []
+    glob_vals = list(globals().values())
+    for key,val in parser_scope.items():
+        if val in glob_vals:
+            if '_' in key:
+                builtin_hidden.append(key)
+            else:
+                builtin_macros.append(key)
+        else:
+            if '_' in key:
+                hidden.append(key)
+            else:
+                macros.append(key)
+
+    print('Builtin macros:', ', '.join(sorted(builtin_macros)), file=sys.stderr)
+    print('Builtin hidden:', ', '.join(sorted(builtin_hidden)), file=sys.stderr)
+    print('User macros :', ', '.join(sorted(macros)), file=sys.stderr)
+    print('User hidden:', ', '.join(sorted(hidden)), file=sys.stderr)
