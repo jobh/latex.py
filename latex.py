@@ -217,6 +217,7 @@ class args:
 
 parser_scope = {}
 
+# Compensate for lack of access to nested scopes in eval/exec
 def glob_scope():
     global parser_scope
     scope = globals().copy()
@@ -308,9 +309,23 @@ def comment_idx(l):
 def escape(line, count=-1):
     global args
     return line.replace(args.macro_prefix, args.escape, count)
-def unescape(line, count=-1):
+def unescape(line):
     global args
-    return line.replace(args.escape, args.macro_prefix, count)
+    line = line.replace(args.escape, args.macro_prefix)
+    # Remove space taken by macros that return nothing. It is complicated because we
+    # do not want macros that expand to nothing to introduce new totally blank lines,
+    # but blank lines in the original text should be preserved. Note also that l may
+    # at this point contain multiple linebreaks.
+    if args.dummy in line:
+        l0 = line
+        line = re.sub(r'^(\s*('+args.dummy+r'\s*)+\n)+',  r'', line)   # lines at the start
+        line = re.sub(r'\n(\s*('+args.dummy+r'\s*)+\n)+', r'\n', line) # ... in the middle
+        line = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', line) # ... at the end
+        line = line.replace(args.dummy, '') # and finally handle lines with other non-whitespace
+        if args.verbose >= 3:
+            print >>args.errf,'==>','"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%line.replace('\n',r'\n')
+    return line
+
 
 def exec_block(lines):
     global args, parser_scope
@@ -403,8 +418,11 @@ def parse(inf_name):
                     len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                     comm_args = ','.join(comm_args)
 
-                    global current_match
-                    current_match = l[match.start():match.start()+len_of_match]
+                    l_in_macro = l[match.start():match.start()+len_of_match]
+
+                    # Gah. Early binding bites. Avoid rebinding the list.
+                    current_match = parser_scope.setdefault('current_match', [])
+                    current_match[:] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
 
                     if type(comm_obj) is str:
                         # The definition is a format string
@@ -416,7 +434,7 @@ def parse(inf_name):
                     try:
                         result = eval(eval_str, glob_scope(), parser_scope) or args.dummy
                     except StopIteration:
-                        result = escape(current_match, 1)
+                        result = escape(l_in_macro, 1)
                     if pending_output:
                         result = pop_pending_output() + '\n' + result
                     if args.verbose >= 3:
@@ -447,25 +465,14 @@ def parse(inf_name):
             # Replace any escape sequences by the original
             l = unescape(l)
 
-        # Remove space taken by macros that return nothing. It is complicated because we
-        # do not want macros that expand to nothing to introduce new totally blank lines,
-        # but blank lines in the original text should be preserved. Note also that l may
-        # at this point contain multiple linebreaks.
-        if args.dummy in l:
-            l0 = l
-            l = re.sub(r'^(\s*('+args.dummy+r'\s*)+\n)+',  r'', l)   # lines at the start
-            l = re.sub(r'\n(\s*('+args.dummy+r'\s*)+\n)+', r'\n', l) # ... in the middle
-            l = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', l) # ... at the end
-            l = l.replace(args.dummy, '') # and finally handle lines with other non-whitespace
-            if args.verbose >= 3:
-                print >>args.errf,prefix2,'==>','"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%l.replace('\n',r'\n')
-
-        if args.output:
+        if l:
             output.append(l)
 
     # If a file ends with an exec block, we might not notice that the block is finished.
     if lines:
         exec_block(lines)
+        if pending_lines:
+            output.append('\n'.join(pending_lines))
 
     return output
 
@@ -543,11 +550,11 @@ class latex_new_comm(object):
         self.finished = True
 
 def latex_newcommand(name, definition=None):
-    global current_match, args, parser_scope
+    global args, parser_scope
     if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
             print >>sys.stderr, r'++ Ignoring \newcommand{%s}'%name
-        return escape(current_match)
+        ignore()
     command = latex_new_comm(name, definition)
     old_cmd = parser_scope.get(name[1:])
     if old_cmd and args.verbose >= 2:
@@ -557,11 +564,11 @@ def latex_newcommand(name, definition=None):
         return name             # finish definition in new_comm.__call__
 
 def latex_renewcommand(name, definition=None):
-    global current_match, args, parser_scope
+    global args, parser_scope
     if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
             print >>sys.stderr, r'++ Ignoring \renewcommand{%s}'%name
-        return escape(current_match)
+        ignore()
     if name[1:] in parser_scope:
         del parser_scope[name[1:]]
     return latex_newcommand(name, definition)
@@ -640,6 +647,12 @@ def ignore(*args):
     else:
         raise StopIteration
 
+def is_sentence_start():
+    b = parser_scope['current_match'][0]
+    if re.search(r'[^:.\s]\s*$', b):
+        return False
+    else:
+        return True
 
 ##########################################################################
 # Command-line invocation
@@ -708,7 +721,8 @@ def main():
 
     for inf in args.infiles:
         lines = parse(inf)
-        args.outf.writelines(lines)
+        if args.output:
+            args.outf.writelines(lines)
 
     if args.build_type:
         args.outf.close()
