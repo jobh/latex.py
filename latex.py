@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 r"""usage: python parse.py [args] file [file2 ...]
 
 Latex preprocessor. There are three main use cases:
@@ -242,7 +242,7 @@ def format(s):
 def _(strs, local_args=None, append=True):
     if strs:
         global pending_output
-        if type(strs) is str:
+        if isinstance(strs, str):
             strs = [strs.strip().lstrip()]
         if local_args:
             strs = [format(s) % local_args for s in strs]
@@ -323,7 +323,7 @@ def unescape(line):
         line = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', line) # ... at the end
         line = line.replace(args.dummy, '') # and finally handle lines with other non-whitespace
         if args.verbose >= 3:
-            print >>args.errf,'==>','"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%line.replace('\n',r'\n')
+            print('==>','"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%line.replace('\n',r'\n'), file=args.errf)
     return line
 
 
@@ -424,7 +424,7 @@ def parse(inf_name):
                     current_match = parser_scope.setdefault('current_match', [])
                     current_match[:] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
 
-                    if type(comm_obj) is str:
+                    if isinstance(comm_obj, str):
                         # The definition is a format string
                         eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
                     else:
@@ -438,19 +438,19 @@ def parse(inf_name):
                     if pending_output:
                         result = pop_pending_output() + '\n' + result
                     if args.verbose >= 3:
-                        print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
-                        print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
-                        print >>args.errf, prefix2,'>>>',eval_str,'==> """%s"""'%result
-                except Exception,e:
-                    if type(e) is KeyError and e.args[0]==comm: severity = 2
-                    else:                                       severity = 1
+                        print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
+                        print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
+                        print(prefix2,'>>>',eval_str,'==> """%s"""'%result, file=args.errf)
+                except Exception as e:
+                    if isinstance(e, KeyError) and e.args[0]==comm: severity = 2
+                    else:                                           severity = 1
 
                     if args.verbose >= severity:
-                        print >>args.errf, prefix1,l.rstrip().replace('\n',r'~')
-                        print >>args.errf, prefix2,' '*match.start()+'^'*len_of_match
+                        print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
+                        print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
                         for s in match.group(0), comm_args, eval_str, repr(e):
                             if s:
-                                print >>args.errf, prefix2,'!!!',s
+                                print(prefix2,'!!!',s, file=args.errf)
 
                     if args.abort >= severity:
                         raise
@@ -553,12 +553,12 @@ def latex_newcommand(name, definition=None):
     global args, parser_scope
     if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
-            print >>sys.stderr, r'++ Ignoring \newcommand{%s}'%name
+            print(r'++ Ignoring \newcommand{%s}'%name, file=sys.stderr)
         ignore()
     command = latex_new_comm(name, definition)
     old_cmd = parser_scope.get(name[1:])
     if old_cmd and args.verbose >= 2:
-        print >>sys.stderr, r'++ Redefining %s'%name
+        print(r'++ Redefining %s'%name, file=sys.stderr)
     parser_scope[name[1:]] = command
     if not command.finished:
         return name             # finish definition in new_comm.__call__
@@ -567,7 +567,7 @@ def latex_renewcommand(name, definition=None):
     global args, parser_scope
     if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
-            print >>sys.stderr, r'++ Ignoring \renewcommand{%s}'%name
+            print(r'++ Ignoring \renewcommand{%s}'%name, file=sys.stderr)
         ignore()
     if name[1:] in parser_scope:
         del parser_scope[name[1:]]
@@ -618,11 +618,11 @@ def set_latex_parse_mode():
 ############### Definitions used by the dependency-printing mode ###############
 def latex_print(n, format, chained_cmd):
     def one_printer(*args):
-        print format%args[n]
+        print(format%args[n])
         if chained_cmd:
             return chained_cmd(*args)
     def all_printer(*args):
-        print '|'.join(args)
+        print('|'.join(args))
         if chained_cmd:
             return chained_cmd(*args)
     if n == None:
@@ -638,7 +638,7 @@ def set_print_mode(cmd, n=None, format='%s'):
 ##########################################################################
 
 def ignore(*args):
-    if len(args) == 1 and callable(args[0]):
+    if len(args) == 1 and hasattr(args[0], '__call__'):
         func = args[0]
         def f(*args):
             func(*args)
@@ -663,7 +663,7 @@ def parse_args():
     global args, parser_scope
 
     if len(sys.argv) <= 1:
-        print __doc__
+        print(__doc__)
         sys.exit(1)
 
     idx = 1
@@ -705,9 +705,9 @@ def parse_args():
             elif len(cmd) == 3:
                 set_print_mode(cmd[0], int(cmd[1])-1, cmd[2])
         elif arg == '-h' or arg == '--help':
-            print __doc__
-            print '========================'
-            print usage_comments
+            print(__doc__)
+            print('========================')
+            print(usage_comments)
             sys.exit(0)
         else:
             break
@@ -728,15 +728,15 @@ def main():
         args.outf.close()
         def system(cmd):
             if args.verbose > 0:
-                print >>args.errf, '>>>', cmd
+                print('>>>', cmd, file=args.errf)
             os.system(cmd)
         if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
             system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
                 or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
         else:
-            print >>args.errf, '*** Error: "latexmk" not found in PATH, skipping build.'
-            print >>args.errf, '*** Use "-o %s" instead, and run %slatex on that one yourself.' \
-                % (args.outf_name, args.build_type)
+            print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
+            print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
+                % (args.outf_name, args.build_type), file=args.errf)
             sys.exit(1)
 
 
