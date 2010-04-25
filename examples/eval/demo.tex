@@ -1,0 +1,20 @@
+\begin{document}
+
+%@py = _eval
+$1+3/5 = @py{1+3/5}$
+
+% May even use the empty string as macro name...
+%@ = _eval
+$2+4/6 = @{2+4/6}$
+
+%@escape = _escape
+@escape{%
+$3+5/7 = @{3+5/7}$
+}%
+
+%@_args.verbose = 1
+% Notice the space after 'del'
+%@del 
+$4+6/8 = @{4+6/8}$
+
+\end{document}

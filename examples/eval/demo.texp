@@ -1,0 +1,13 @@
+\begin{document}
+
+$1+3/5 = 1.6$
+
+% May even use the empty string as macro name...
+$2+4/6 = 2.66666666667$
+
+$3+5/7 = @{3+5/7}$
+
+% Notice the space after 'del'
+$4+6/8 = @{4+6/8}$
+
+\end{document}

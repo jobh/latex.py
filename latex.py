@@ -34,7 +34,7 @@ Latex preprocessor. There are three main use cases:
     -v <level>
     --verbose <level>    0: print nothing, 1: print errors except KeyError,
                          [2]: print all errors, 3: print a lot.
-    -lm
+    -M
     --list-macros        After execution, list the defined macros.
 
     -a <level>
@@ -205,14 +205,14 @@ import itertools
 ########## Global variables ###############################
 parser_scope = {}
 parser_scope['parser_scope'] = parser_scope
-def macro(s):
+def in_parser_scope(s):
     def wrap(f):
         global parser_scope
         parser_scope[s] = f
         return f
     return wrap
 
-@macro('_args')
+@in_parser_scope('_args')
 class args:
     __init__     = None         # disallow instantiation
     build_type   = None
@@ -226,7 +226,7 @@ class args:
     macro_prefix = '@'
     escape       = '{_}'
     dummy        = '{__}'
-    pattern      = r'([a-zA-Z0-9*]+)[^a-zA-Z0-9*]'
+    pattern      = r'a-zA-Z0-9*'
 
 ########## Used by the @out definitions (see above) ###############
 pending_output = []
@@ -243,7 +243,7 @@ def format(s):
     s = replace_re.sub(replace_with, s)
     return s
 
-@macro('_')
+@in_parser_scope('_')
 def output(strs, local_args=None, append=True):
     if strs:
         global pending_output
@@ -294,7 +294,8 @@ def consume_args(l):
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
-    (re.compile(r'^(\w+)\s*='), r'parser_scope[r"\1"] ='),   # reserved word?
+    (re.compile(r'^([%s]*)\s*='%args.pattern), r'parser_scope[r"\1"] ='),   # reserved word?
+    (re.compile(r'^del +([%s]*)'%args.pattern), r'del parser_scope[r"\1"]'), 
     (re.compile(r'^(\s*):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
     (re.compile(r'^(\w+)\s*:\s*(\S.*)$'), r'\1 = _(r"\2", local_args=locals(), append=False)'),
     ]
@@ -311,7 +312,7 @@ def comment_idx(l):
     cmatch = re.search(r'[^\\]%', l)
     return cmatch and cmatch.start()+1
 
-@macro('_escape')
+@in_parser_scope('_escape')
 def escape(line, count=-1):
     global args
     return line.replace(args.macro_prefix, args.escape, count)
@@ -399,7 +400,7 @@ def parse(inf_name):
                 collected = l
                 continue
 
-            re_string = re.escape(args.macro_prefix)+args.pattern
+            re_string = re.escape(args.macro_prefix)+r'([%s]*)[^%s]'%(args.pattern,args.pattern)
 
             prefix1 = inf_name+' '+str(lno)+':'
             prefix2 = ' '*(len(prefix1)-1)+':'
@@ -636,7 +637,7 @@ def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
 ##########################################################################
 
-@macro('_ignore')
+@in_parser_scope('_ignore')
 def ignore(*args):
     if len(args) == 1 and hasattr(args[0], '__call__'):
         func = args[0]
@@ -647,7 +648,7 @@ def ignore(*args):
     else:
         raise StopIteration
 
-@macro('is_sentence_start')
+@in_parser_scope('is_sentence_start')
 def is_sentence_start():
     global parser_scope
     b = parser_scope['current_match'][0]
@@ -655,6 +656,13 @@ def is_sentence_start():
         return False
     else:
         return True
+
+@in_parser_scope('_eval')
+def do_eval(x):
+    try:
+        return str(eval(x))
+    except:
+        ignore()
 
 ##########################################################################
 # Command-line invocation
@@ -681,7 +689,7 @@ def parse_args():
         elif arg == '-v' or arg == '--verbose':
             idx += 1
             args.verbose = int(sys.argv[idx])
-        elif args == '-lm' or arg == '--list-macros':
+        elif arg == '-M' or arg == '--list-macros':
             args.list_macros = True
         elif arg == '-a' or arg == '--abort':
             idx += 1
