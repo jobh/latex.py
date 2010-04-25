@@ -34,6 +34,9 @@ Latex preprocessor. There are three main use cases:
     -v <level>
     --verbose <level>    0: print nothing, 1: print errors except KeyError,
                          [2]: print all errors, 3: print a lot.
+    -lm
+    --list-macros        After execution, list the defined macros.
+
     -a <level>
     --abort <level>      Abort on any error that the same verbosity level
                          would print (with -v). It should normally not be set
@@ -197,7 +200,7 @@ import sys
 import os
 import subprocess
 import re
-
+import itertools
 
 ########## Global variables ###############################
 parser_scope = {}
@@ -218,6 +221,7 @@ class args:
     verbose      = 2
     abort        = 1
     output       = True
+    list_macros  = False
     block_prefix = '%@'
     macro_prefix = '@'
     escape       = '{_}'
@@ -349,7 +353,7 @@ def parse(inf_name):
     else:
         inf = open(inf_name)
 
-    for lno,l in enumerate(inf):
+    for lno,l in enumerate(itertools.chain(inf, [''])):
         lno += 1
 
         # Handle {%@ ... }%@. We need to save up a full block of code before
@@ -467,12 +471,6 @@ def parse(inf_name):
 
         if l:
             output.append(l)
-
-    # If a file ends with an exec block, we might not notice that the block is finished.
-    if lines:
-        exec_block(lines)
-        if pending_lines:
-            output.append('\n'.join(pending_lines))
 
     return output
 
@@ -683,6 +681,8 @@ def parse_args():
         elif arg == '-v' or arg == '--verbose':
             idx += 1
             args.verbose = int(sys.argv[idx])
+        elif args == '-lm' or arg == '--list-macros':
+            args.list_macros = True
         elif arg == '-a' or arg == '--abort':
             idx += 1
             args.abort = int(sys.argv[idx])
@@ -718,34 +718,7 @@ def parse_args():
 
     args.infiles = sys.argv[idx:]
 
-def main():
-    global args
-    parse_args()
-
-    for inf in args.infiles:
-        lines = parse(inf)
-        if args.output:
-            args.outf.writelines(lines)
-
-    if args.build_type:
-        args.outf.close()
-        def system(cmd):
-            if args.verbose > 0:
-                print('>>>', cmd, file=args.errf)
-            os.system(cmd)
-        if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
-            system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
-                or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
-        else:
-            print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
-            print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
-                % (args.outf_name, args.build_type), file=args.errf)
-            sys.exit(1)
-
-
-if __name__ == '__main__':
-    main()
-
+def list_macros():
     builtin_macros = []
     builtin_hidden = []
     macros = []
@@ -767,3 +740,35 @@ if __name__ == '__main__':
     print('Builtin hidden:', ', '.join(sorted(builtin_hidden)), file=sys.stderr)
     print('User macros :', ', '.join(sorted(macros)), file=sys.stderr)
     print('User hidden:', ', '.join(sorted(hidden)), file=sys.stderr)
+
+
+def main():
+    global args
+    parse_args()
+
+    for inf in args.infiles:
+        lines = parse(inf)
+        if args.output:
+            args.outf.writelines(lines)
+    if args.outf not in [sys.stdout, sys.stderr]:
+        args.outf.close()
+
+    if args.list_macros:
+        list_macros()
+
+    if args.build_type:
+        def system(cmd):
+            if args.verbose > 0:
+                print('>>>', cmd, file=args.errf)
+            os.system(cmd)
+        if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
+            system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
+                or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
+        else:
+            print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
+            print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
+                % (args.outf_name, args.build_type), file=args.errf)
+            sys.exit(1)
+
+if __name__ == '__main__':
+    main()

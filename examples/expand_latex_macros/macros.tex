@@ -124,6 +124,11 @@ def version():
         abbrev += 1
     ver = ver[-abbrev-2:-1]
     try:
+        # For regression testing purposes.
+        ver = _REV
+    except:
+        pass
+    try:
         cmd = 'git rev-parse --short %s' % BASE_REV
         cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         base_ver = str(cmd.communicate()[0].strip())
