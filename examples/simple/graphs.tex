@@ -5,7 +5,7 @@
 
 {%@
 import glob
-for c,f in enumerate(sorted(glob.glob('*,*,*,*.eps'))):
+for c,f in enumerate(sorted(glob.glob('data/*.pdf'))):
     name = f[:-4]
     : \begin{figure}[p]
     : \includegraphics[width=\textwidth]{#(name)}
