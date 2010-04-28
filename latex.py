@@ -236,6 +236,8 @@ class args:
 pending_output = []
 def pop_pending_output():
     global pending_output
+    if pending_output:
+        pending_output.append('')
     ret = '\n'.join(pending_output)
     pending_output = []
     return ret
