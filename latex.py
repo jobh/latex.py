@@ -80,125 +80,6 @@ Latex preprocessor. There are three main use cases:
     --help               Print this text and more
 """
 
-usage_comments = r"""
-The rules:
-
--- Lines starting with %@ are executed normally in python
-
--- Same for lines between "{%@" and "}%@" (note that any text on the lines
--- containing [{}]%@ will be ignored):
---  {%@
---  <python code>
---  }%@
-
--- execution happens after a block is closed (by a line without %@, or with }%@)
-
--- The stuff above is used to define MACROS as python functions,
--- these are replaced by the RETURN VALUE of the function upon use.
-
--- IMPORTANT: Macro names consists of alphanumerics plus '*' (no underscores).
--- Change _PATTERN_ if you must.
-
---- Typical definitions are like the following. These work exactly
---- the same, frac2 is only useful for simple substitutions though.
-%@frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
-
-%@frac2 = r'\mathrm{%s/%s}'
-
-%@def frac3(x,y):
-%@    return r'\mathrm{%s/%s}'%(x,y)
-
---- Macro arguments over multiple lines are ok IFF either the line breaks are
---- within the enclosing brackets, or line continuations (%) are used. Examples:
-
-@frac{1}{2}
-
-@frac  {1}  {2}
-
-@frac{
-1}%
-{2}
-
---- As a special case, exactly one latex-style optional (square bracket) argument
---- can be used. It is moved to the end:
-%@def testme(exp, base='10'):
-%@    return '$%s^{%s}$' % (base, exp)
---- can be called as
-@testme[10]{5.4}
-@testme{5.4}
-or
-@testme{5.4}{10}
-
---- The command prefix etc can be redefined. This can be handy to
---- expand macros in a latex file without changing them. See also '-L' mode, which does
---- this better, by also understanding \newcommand and \input.
-%@_PREFIX_ = '\\'
-
---- There are two allowed syntactic sugarings for returning text:
-%@@formatted
-%@def testme(exp, base='10'):
-%@    : $#(base)^{#(exp)}$
---- (or equivalently)
-%@def testme(exp, base='10'):
-%@    return format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
-
---- The other one is the simple string substitution described above (see frac2).
-
---- But this one allows multiple lines of text. Let's try a more complicated
---- example. The special syntax ': <text>' is converted to '_(r"<text>")', where _() is a
---- function which queues 'format(r"<text>")%_kwargs' to the output, and
---- _kwargs is a dict composed from the arguments. format() converts from
---- '#(name)' to '%(name)s'.
-{%@
-@formatted
-def autotable(f,rows,caption=None):
-  rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
-  _(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
-  :\toprule
-  _(rows[0])
-  :\midrule
-  _(rows[1:])
-  :\bottomrule
-  :\end{matrix}
-  if caption:
-    :\caption{#(caption)}
-}%@
-
---- This input:
-@autotable{rc}{
-x & y & z\\
-r & b & x\\
-a & f & f
-}
---- expands into:
-\begin{matrix}{rcc}
-\toprule
-x & y & z\\
-\midrule
-r & b & x\\
-a & f & f
-\bottomrule
-\end{matrix}
-
---- Note that for '_()' or '_kwargs' to work, '@formatted' must be used; while 'format()',
---- which just converts from '#(name)' to '%(name)s', can be used anywhere.
-
---- Working around python reserved words. These are allowed in *plain assignments* only.
---- like this:
-%@def = r'Definition:'
-%@del = r'\nabla'
-
---- The same technique can be used to create macros that contain characters that aren't
---- legal in identifiers in python (*).
---- If you want to use this for functions, use lambda or aliases:
-%@def* = lambda x: "Definition:"+x
-
-%@@out
-%@def _def(x):
-%@    : "Definition: "+x
-%@def* = _def
-"""
-
 import sys
 import os
 import subprocess
@@ -243,6 +124,7 @@ def pop_pending_output():
     return ret
 
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
+@in_parser_scope('_format')
 def format(s):
     replace_re, replace_with = format_replacer
     s = s.replace('%', '%%')
@@ -344,7 +226,11 @@ def exec_block(lines):
     if args.verbose >= 3:
         debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
         args.errf.write(debuglines);
-    exec(lines, parser_scope)
+    try:
+        exec(lines, parser_scope)
+    except:
+        print(lines, file=args.errf)
+        raise
 
 def parse(inf_name):
     global args, parser_scope
@@ -728,8 +614,6 @@ def parse_args():
                 set_print_mode(cmd[0], int(cmd[1])-1, cmd[2])
         elif arg == '-h' or arg == '--help':
             print(__doc__)
-            print('========================')
-            print(usage_comments)
             sys.exit(0)
         else:
             break

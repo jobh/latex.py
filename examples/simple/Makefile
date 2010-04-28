@@ -12,3 +12,6 @@ expand-macros.texp: expand-macros.tex
 
 eval.texp: eval.tex
 	$(latex.py) -B -o $@ $<
+
+messy-example.texp: messy-example.tex
+	$(latex.py) -B -o $@ $<

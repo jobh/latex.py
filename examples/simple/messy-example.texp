@@ -1,0 +1,124 @@
+The rules:
+
+-- Lines starting with 
+-- Same for lines between "{-- containing [{}]--  {--  <python code>
+--  }
+-- execution happens after a block is closed (by a line without 
+-- The stuff above is used to define MACROS as python functions,
+-- these are replaced by the RETURN VALUE of the function upon use.
+
+-- IMPORTANT: Macro names consists of alphanumerics plus '*' (no underscores).
+-- Change _args.pattern if you must.
+
+--- Typical definitions are like the following. These work exactly
+--- the same, frac2 is only useful for simple substitutions though.
+%@frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
+
+%@frac2 = r'\mathrm{%s/%s}'
+
+%@def frac3(x,y):
+%@    return r'\mathrm{%s/%s}'%(x,y)
+
+%@def frac4(x,y):  # see below for explanation
+%@    : \mathrm{#(x)/#(y)}
+
+--- Macro arguments over multiple lines are ok IFF either the line breaks are
+--- within the enclosing brackets, or line continuations (%) are used. Examples:
+
+\mathrm{1/2}
+
+\mathrm{1/2}
+
+\mathrm{
+1/2}
+
+--- As a special case, exactly one latex-style optional (square bracket) argument
+--- can be used. It is moved to the end:
+%@def testme(exp, base='10'):
+%@    return '$%s^{%s}$' % (base, exp)
+--- can be called as
+$10^{5.4}$
+$10^{5.4}$
+or
+$10^{5.4}$
+
+--- The command prefix etc can be redefined. This can be handy to
+--- expand macros in a latex file without changing them. See also '-L' mode, which does
+--- this better, by also understanding \newcommand and \input.
+%@_args.macro_prefix='\\'
+%@_args.verbose = 1
+
+--- Some syntactic sugar for returning text:
+%@def testme(exp, base='10'):
+%@    : $#(base)^{#(exp)}$
+--- (or equivalently)
+%@def testme(exp, base='10'):
+%@    return _format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
+
+--- This is also allowable to return text from blocks of code, and to define
+--- variables.
+%@name : \emph{Your name here}
+\emph{Your name here}
+
+%@for x in range(3):
+%@    val = str(x)
+%@    : \emph{#(val)}
+\emph{0}
+\emph{1}
+\emph{2}
+
+--- But this one allows multiple lines of text. Let's try a more complicated
+--- example. The special syntax ': <text>' is converted to
+--- '_(r"<text>", local_args=locals())', which replaces '#(x)' with '%(x)s'
+--- in <text>, and outputs <text>%locals.
+%@def autotable(f,rows,caption=None):
+%@  rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
+%@  _(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
+%@  :\toprule
+%@  _(rows[0])
+%@  :\midrule
+%@  _(rows[1:])
+%@  :\bottomrule
+%@  :\end{matrix}
+%@  if caption:
+%@    :\caption{#(caption)}
+
+--- This input:
+\ autotable{rc}{
+x & y & z\\
+r & b & x\\
+a & f & f
+}
+--- expands into:
+\begin{matrix}{rcc}
+\toprule
+x & y & z\\
+\midrule
+r & b & x\\
+a & f & f\\
+\bottomrule
+\end{matrix}
+
+--- Working around python reserved words: These are allowed in *plain assignments* only.
+--- like this:
+%@def = r'Definition:'
+%@del = r'\nabla'
+
+--- The same technique can be used to create macros that contain characters that aren't
+--- legal in identifiers in python ('*').
+--- If you want to use this for functions, use lambda or aliases or
+--- whatever. The following definitions are all equivalent.
+
+%@def* = lambda x: "Definition: "+x
+Definition: this
+
+%@def _def(x):
+%@    : Definition: #(x)
+%@def* = _def
+Definition: this
+
+%@def* = r'Definition: %s'
+Definition: this
+
+--- Other uses of reserved words must use the scope dict explicitly:
+%@del parser_scope['def*']
