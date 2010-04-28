@@ -1,0 +1,31 @@
+% This file can be parsed by both standard latex and by latex.py. It's just
+% here to document a few tricks, which may or may not be useful.
+% Note that:
+% - the latex.py definition must follow the LaTeX definition
+% - the difference in \pythononly, where LaTeX parses the argument on the
+%   following line, but latex.py does not.
+
+\documentclass{article}
+
+\newcommand{\pythononly}[1]{} % make latex ignore python blocks
+\newcommand{\latexonly}[1]{#1}
+
+\begin{document}
+
+% To see, run 'latex.py -L -o various.pdf various.tex; evince various.pdf'
+\pythononly
+This document is prepared with \empy{latex.py}.
+% The following doesn't require the \pythononly.
+Right?
+
+% To see, run 'latex various.tex; evince various.pdf'
+\latexonly%
+{
+This document is prepared with plain \LaTeX.
+}
+
+% Of course, we could simply have done the following.
+\newcommand{\textprocessor}{plain \LaTeX}
+To repeat: we used \textprocessor!
+
+\end{document}

@@ -15,3 +15,6 @@ eval.texp: eval.tex
 
 messy-example.texp: messy-example.tex
 	$(latex.py) -B -o $@ $<
+
+various.texp: various.tex
+	$(latex.py) -o $@ $<
