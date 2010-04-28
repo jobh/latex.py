@@ -184,6 +184,7 @@ def consume_args(l):
 replacers = [
     (re.compile(r'^([%s]*)\s*='%args.pattern), r'parser_scope[r"\1"] ='),   # reserved word?
     (re.compile(r'^(\s*):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
+    (re.compile(r'^(\s*)return\s+:\s*(\S.*)$'), r'\1return _(r"\2", local_args=locals(), append=False)'),
     (re.compile(r'^(\w+)\s*:\s*(\S.*)$'), r'\1 = _(r"\2", local_args=locals(), append=False)'),
     ]
 
@@ -336,7 +337,7 @@ def parse(inf_name):
                     except StopIteration:
                         result = escape(l_in_macro, 1)
                     if pending_output:
-                        result = pop_pending_output() + '\n' + result
+                        result = pop_pending_output() + result
                     if args.verbose >= 3:
                         print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
                         print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
