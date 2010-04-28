@@ -7,5 +7,5 @@
 *.bak
 *.pyc
 .emacs.desktop*
-*.texp
+*.pdf
 auto
