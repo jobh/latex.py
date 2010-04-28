@@ -35,7 +35,10 @@ Latex preprocessor. There are three main use cases:
     --verbose <level>    0: print nothing, 1: print errors except KeyError,
                          [2]: print all errors, 3: print a lot.
     -M
-    --list-macros        After execution, list the defined macros.
+    --show-macros        After execution, list the defined macros.
+
+    -B
+    --show-blocks        Leave exec'ed blocks in the output, commented out
 
     -a <level>
     --abort <level>      Abort on any error that the same verbosity level
@@ -221,7 +224,8 @@ class args:
     verbose      = 2
     abort        = 1
     output       = True
-    list_macros  = False
+    show_macros  = False
+    show_blocks  = False
     block_prefix = '%@'
     macro_prefix = '@'
     escape       = '{_}'
@@ -295,7 +299,6 @@ def consume_args(l):
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
     (re.compile(r'^([%s]*)\s*='%args.pattern), r'parser_scope[r"\1"] ='),   # reserved word?
-    (re.compile(r'^del +([%s]*)'%args.pattern), r'del parser_scope[r"\1"]'), 
     (re.compile(r'^(\s*):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
     (re.compile(r'^(\w+)\s*:\s*(\S.*)$'), r'\1 = _(r"\2", local_args=locals(), append=False)'),
     ]
@@ -370,11 +373,15 @@ def parse(inf_name):
                 l = pop_pending_output()
             else:
                 lines += fixup_line(l);
+                if args.show_blocks:
+                    output.append(args.block_prefix+l)
                 continue
 
         # Handle %@ lines. We need to save up a full block before exec'ing.
         if l.startswith(args.block_prefix):
             lines += fixup_line(l[len(args.block_prefix):])
+            if args.show_blocks:
+                output.append(l)
             continue
         elif lines:
             exec_block(lines)
@@ -689,8 +696,10 @@ def parse_args():
         elif arg == '-v' or arg == '--verbose':
             idx += 1
             args.verbose = int(sys.argv[idx])
-        elif arg == '-M' or arg == '--list-macros':
-            args.list_macros = True
+        elif arg == '-M' or arg == '--show-macros':
+            args.show_macros = True
+        elif arg == '-B' or arg == '--show-blocks':
+            args.show_blocks = True
         elif arg == '-a' or arg == '--abort':
             idx += 1
             args.abort = int(sys.argv[idx])
@@ -726,7 +735,7 @@ def parse_args():
 
     args.infiles = sys.argv[idx:]
 
-def list_macros():
+def show_macros():
     builtin_macros = []
     builtin_hidden = []
     macros = []
@@ -761,8 +770,8 @@ def main():
     if args.outf not in [sys.stdout, sys.stderr]:
         args.outf.close()
 
-    if args.list_macros:
-        list_macros()
+    if args.show_macros:
+        show_macros()
 
     if args.build_type:
         def system(cmd):

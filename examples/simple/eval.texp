@@ -1,13 +1,42 @@
 \begin{document}
 
+% Eval is by default not visible as a macro due to the underline in
+% the name (underline is considered as a separator). Make it available
+% by binding to the macro name 'py':
+%@py = _eval
+
 $1+3/5 = 1.6$
 
-% May even use the empty string as macro name...
+% We can even use the empty string as macro name. This is still fairly safe,
+% (b) it is even more uncommon that the '...' part is a valid python expression.
+%@ = _eval
+
 $2+4/6 = 2.66666666667$
 
+% The following is escaped, and hence not eval'ed.
+%@escape = _escape
 $3+5/7 = @{3+5/7}$
 
-% Notice the space after 'del'
+% Another way is to specify that expansion only happens if there is exactly
+% one argument (that is, ignore wrong argument count instead of raising an
+% exception).
+%@ = lambda *args: len(args)==1 and _eval(args[0]) or _ignore()
+$2+4/6 = 2.66666666667$
+$2+4/6 = @{2+4/6}{}$
+
+
+% While '=' is special-cased to allow using reserved python words as macro
+% names, or even the empty string, these cannot be manipulated in other ways
+% in standard python. How to --- for example --- delete the macro named ''?
+% Two ways: Assign the '_ignore' function, or delete it from parser_scope
+% directly. That is, either of the following two directives is sufficient:
+%@ = _ignore
+%@del parser_scope['']
+
+% Note, however, that KeyErrors are normally reported so that missing macro
+% definitions are identified. We can turn this off for now.
+%@_args.verbose = 1
+
 $4+6/8 = @{4+6/8}$
 
 \end{document}

@@ -11,4 +11,4 @@ expand-macros.texp: expand-macros.tex
 	$(latex.py) -L -o $@ $<
 
 eval.texp: eval.tex
-	$(latex.py) -o $@ $<
+	$(latex.py) -B -o $@ $<
