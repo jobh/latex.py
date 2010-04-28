@@ -9,3 +9,6 @@ expand-macros.pdf: expand-macros.tex
 	$(latex.py) -L -o $@ $<
 expand-macros.texp: expand-macros.tex
 	$(latex.py) -L -o $@ $<
+
+eval.texp: eval.tex
+	$(latex.py) -o $@ $<
