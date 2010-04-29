@@ -182,10 +182,21 @@ def consume_args(l):
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
-    (re.compile(r'^([%s]*)\s*='%args.pattern), r'parser_scope[r"\1"] ='),   # reserved word?
-    (re.compile(r'^(\s*):\s*(.*)$'), r'\1_(r"\2", local_args=locals())'),  # magic ':' syntax
-    (re.compile(r'^(\s*)return\s+:\s*(\S.*)$'), r'\1return _(r"\2", local_args=locals(), append=False)'),
-    (re.compile(r'^(\w+)\s*:\s*(\S.*)$'), r'\1 = _(r"\2", local_args=locals(), append=False)'),
+    #    return : \vec{#(x)}
+    #--> return _(r'\vec{#(x)}', local_args=locals(), append=False)
+    # Only at beginning of line:
+    #    del = : \nabla
+    #--> del = _(r'\nabla', local_args=locals(), append=False)
+    (re.compile(r'^([%s]*\s*=|\s*return)\s*:\s*(\S.*)$'%args.pattern),
+     r'\1 _(r"\2", local_args=locals(), append=False)'),
+    #    del = r'\nabla'
+    #--> parser_scope[r"del"] = r'\nabla'
+    (re.compile(r'^([%s]*)\s*='%args.pattern),
+     r'parser_scope[r"\1"] ='),
+    #    : \vec{#(x)}
+    #--> _(r'\vec{#(x)}', local_args=locals()
+    (re.compile(r'^(\s*):\s*(.*)$'),
+     r'\1_(r"\2", local_args=locals())'), 
     ]
 
 def fixup_line(l):
