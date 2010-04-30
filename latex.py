@@ -229,7 +229,8 @@ def unescape(line):
         line = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', line) # ... at the end
         line = line.replace(args.dummy, '') # and finally handle lines with other non-whitespace
         if args.verbose >= 3:
-            print('==>','"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%line.replace('\n',r'\n'), file=args.errf)
+            global prefix1
+            print(prefix1,'"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%line.replace('\n',r'\n'), file=args.errf)
     return line
 
 
@@ -309,6 +310,7 @@ def parse(inf_name):
 
             re_string = re.escape(args.macro_prefix)+r'([%s]*)[^%s]'%(args.pattern,args.pattern)
 
+            global prefix1
             prefix1 = inf_name+' '+str(lno)+':'
             prefix2 = ' '*(len(prefix1)-1)+':'
 
@@ -499,14 +501,18 @@ def latex_usepackage(names, opt=None):
 def latex_documentclass(name, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
-    _latex['documentclass'] = [name]+opt
+    _latex['documentclass'] = name
+    _latex['documentclass_opts'] = opt
     ignore()
 
 def latex_begin(name, *args):
     _latex['environment'].append(name)
     ignore()
 def latex_end(name):
-    _latex['environment'].pop()
+    expected_name = _latex['environment'].pop()
+    if expected_name != name:
+        global prefix1
+        print(prefix1, 'Expected "\end{%s}", not "%s"'%(expected_name, name), file=args.errf)
     ignore()
 
 def set_latex_parse_mode():
@@ -563,6 +569,18 @@ def is_sentence_start():
         return False
     else:
         return True
+
+@in_parser_scope('upcase_at_start')
+def upcase_at_start(func_or_str):
+    def wrapper(*args, **kwargs):
+        if isinstance(func_or_str, str):
+            ret = func_or_str % args
+        else:
+            ret = func_or_str(*args, **kwargs)
+        if is_sentence_start() and ret and isinstance(ret, str):
+            ret = ret[0].upper()+ret[1:]
+        return ret
+    return wrapper
 
 @in_parser_scope('_eval')
 def do_eval(x):
