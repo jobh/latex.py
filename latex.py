@@ -565,6 +565,7 @@ def ignore(*args):
 def is_sentence_start():
     global parser_scope
     b = parser_scope['current_match'][0]
+    # Check if text preceding match ends with a character that is not '.' or ':'
     if re.search(r'[^:.\s]\s*$', b):
         return False
     else:
@@ -572,6 +573,8 @@ def is_sentence_start():
 
 @in_parser_scope('upcase_at_start')
 def upcase_at_start(func_or_str):
+    """Decorator (or function, if called with string) to upcase first character
+    if it is at the beginning of a sentence."""
     def wrapper(*args, **kwargs):
         if isinstance(func_or_str, str):
             ret = func_or_str % args
@@ -588,6 +591,27 @@ def do_eval(x):
         return str(eval(x))
     except:
         ignore()
+
+def match_has_optional_parameter():
+    global parser_scope, args
+    m = parser_scope['current_match'][1]
+    return re.match(r'.[%s]*[[]'%args.pattern, m)
+    
+@in_parser_scope('opt_kwargs')
+def opt_kwargs(func):
+    """Decorator to allow calling a function like \func[key=val,other=foo]{text}."""
+    def wrapper(*args):
+        kwargs = {}
+        if match_has_optional_parameter():
+            for kwarg in args[-1].split(','):
+                try:
+                    key,val = kwarg.split('=',1)
+                    kwargs[key] = val
+                except:
+                    kwargs[kwarg] = ''
+            args = args[:-1]
+        return func(*args, **kwargs)
+    return wrapper
 
 ##########################################################################
 # Command-line invocation
