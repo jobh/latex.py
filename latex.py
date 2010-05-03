@@ -113,6 +113,9 @@ class args:
     dummy        = '{__}'
     pattern      = r'a-zA-Z0-9*'
 
+usage_count = {}
+parser_scope['usage_count'] = usage_count
+
 ########## Used by the @out definitions (see above) ###############
 pending_output = []
 def pop_pending_output():
@@ -330,6 +333,8 @@ def parse(inf_name):
                 comm_args = eval_str = ''
                 try:
                     comm_obj = parser_scope[comm]
+                    usage_count.setdefault(comm, 0)
+                    usage_count[comm] += 1
                     comm_args,l_after_macro = consume_args(l_after_macro)
                     len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                     comm_args = ','.join(comm_args)
@@ -613,6 +618,18 @@ def opt_kwargs(func):
         return func(*args, **kwargs)
     return wrapper
 
+@in_parser_scope('_shell')
+def _shell(cmd):
+    import subprocess
+    if isinstance(cmd, str):
+        cmd = cmd.split()
+    try:
+        cmd = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    except:
+        print(cmd, file=args.errf)
+        raise
+    return cmd.communicate()[0].decode()
+
 ##########################################################################
 # Command-line invocation
 ##########################################################################
@@ -682,21 +699,25 @@ def show_macros():
     hidden = []
     glob_vals = list(globals().values())
     for key,val in parser_scope.items():
-        if val in glob_vals:
+        if val in glob_vals or key in ['current_match', '__builtins__']:
             if '_' in key:
                 builtin_hidden.append(key)
             else:
+                if not key in usage_count:
+                    key += ' (unused)'
                 builtin_macros.append(key)
         else:
             if '_' in key:
                 hidden.append(key)
             else:
+                if not key in usage_count:
+                    key += ' (unused)'
                 macros.append(key)
 
-    print('Builtin macros:', ', '.join(sorted(builtin_macros)), file=sys.stderr)
-    print('Builtin hidden:', ', '.join(sorted(builtin_hidden)), file=sys.stderr)
-    print('User macros :', ', '.join(sorted(macros)), file=sys.stderr)
-    print('User hidden:', ', '.join(sorted(hidden)), file=sys.stderr)
+    print('Global (hidden):', ', '.join(sorted(builtin_hidden)), file=args.errf)
+    print('User (hidden):', ', '.join(sorted(hidden)), file=args.errf)
+    print('Global:', ', '.join(sorted(builtin_macros)), file=args.errf)
+    print('User:', ', '.join(sorted(macros)), file=args.errf)
 
 
 def main():
