@@ -191,7 +191,7 @@ replacers = [
     #    del = : \nabla
     #--> del = _(r'\nabla', local_args=locals(), append=False)
     (re.compile(r'^([%s]*\s*=|\s*return)\s*:\s*(\S.*)$'%args.pattern),
-     r'\1 _(r"\2", local_args=locals(), append=False)'),
+     r'\1 _(r"""\2""", local_args=locals(), append=False)'),
     #    del = r'\nabla'
     #--> parser_scope[r"del"] = r'\nabla'
     (re.compile(r'^([%s]*)\s*='%args.pattern),
@@ -199,7 +199,7 @@ replacers = [
     #    : \vec{#(x)}
     #--> _(r'\vec{#(x)}', local_args=locals()
     (re.compile(r'^(\s*):\s*(.*)$'),
-     r'\1_(r"\2", local_args=locals())'), 
+     r'\1_(r"""\2""", local_args=locals())'), 
     ]
 
 def fixup_line(l):
@@ -261,131 +261,132 @@ def parse(inf_name):
     else:
         inf = open(inf_name)
 
-    for lno,l in enumerate(itertools.chain(inf, [''])):
-        lno += 1
+    with inf:
+        for lno,l in enumerate(itertools.chain(inf, [''])):
+            lno += 1
 
-        # Handle {%@ ... }%@. We need to save up a full block of code before
-        # exec'ing.
-        if l.startswith('{'+args.block_prefix):
-            consuming = True
-            continue
-        elif consuming:
-            if l.startswith('}'+args.block_prefix):
-                consuming = False
+            # Handle {%@ ... }%@. We need to save up a full block of code before
+            # exec'ing.
+            if l.startswith('{'+args.block_prefix):
+                consuming = True
+                continue
+            elif consuming:
+                if l.startswith('}'+args.block_prefix):
+                    consuming = False
+                    exec_block(lines)
+                    lines = ''
+                    l = pop_pending_output()
+                else:
+                    lines += fixup_line(l);
+                    if args.show_blocks:
+                        output.append(args.block_prefix+l)
+                    continue
+
+            # Handle %@ lines. We need to save up a full block before exec'ing.
+            if l.startswith(args.block_prefix):
+                lines += fixup_line(l[len(args.block_prefix):])
+                if args.show_blocks:
+                    output.append(l)
+                continue
+            elif lines:
                 exec_block(lines)
                 lines = ''
-                l = pop_pending_output()
-            else:
-                lines += fixup_line(l);
-                if args.show_blocks:
-                    output.append(args.block_prefix+l)
-                continue
+                collected = pop_pending_output()
 
-        # Handle %@ lines. We need to save up a full block before exec'ing.
-        if l.startswith(args.block_prefix):
-            lines += fixup_line(l[len(args.block_prefix):])
-            if args.show_blocks:
-                output.append(l)
-            continue
-        elif lines:
-            exec_block(lines)
-            lines = ''
-            collected = pop_pending_output()
+            if collected:
+                l = collected+l
+                collected = ''
 
-        if collected:
-            l = collected+l
-            collected = ''
-
-        # Handle in-line macros. We need to save up enough lines to be certain that
-        # all arguments are present (i.e., until braces are balanced and 
-        # line continuations (%) are eaten).
-        if args.macro_prefix in l:
-            if '%' in l:
-                # line continuations?
-                idx = comment_idx(l)
-                if idx != None:
-                    collected = l[:idx]
+            # Handle in-line macros. We need to save up enough lines to be certain that
+            # all arguments are present (i.e., until braces are balanced and 
+            # line continuations (%) are eaten).
+            if args.macro_prefix in l:
+                if '%' in l:
+                    # line continuations?
+                    idx = comment_idx(l)
+                    if idx != None:
+                        collected = l[:idx]
+                        continue
+                if l.count('{') > l.count('}'):
+                    # balanced braces
+                    collected = l
                     continue
-            if l.count('{') > l.count('}'):
-                # balanced braces
-                collected = l
-                continue
 
-            re_string = re.escape(args.macro_prefix)+r'([%s]*)[^%s]'%(args.pattern,args.pattern)
+                re_string = re.escape(args.macro_prefix)+r'([%s]*)[^%s]'%(args.pattern,args.pattern)
 
-            global prefix1
-            prefix1 = inf_name+' '+str(lno)+':'
-            prefix2 = ' '*(len(prefix1)-1)+':'
+                global prefix1
+                prefix1 = inf_name+' '+str(lno)+':'
+                prefix2 = ' '*(len(prefix1)-1)+':'
 
-            # Run through line repeatedly until no more matches are found. This means
-            # that a macro can use other macros, by repeated expansion.
-            while True:
-                # Try to match a macro name (should be successful, but maybe not
-                # if e.g. the line ends with '\\'.
-                match = re.search(re_string, l)
-                if not match:
-                    break
+                # Run through line repeatedly until no more matches are found. This means
+                # that a macro can use other macros, by repeated expansion.
+                while True:
+                    # Try to match a macro name (should be successful, but maybe not
+                    # if e.g. the line ends with '\\'.
+                    match = re.search(re_string, l)
+                    if not match:
+                        break
 
-                l_before_macro = l[:match.start()]
-                l_after_macro = l[match.end()-1:]
-                len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
-                comm = match.group(1) # the command (macro) name
-                comm_args = eval_str = ''
-                try:
-                    comm_obj = parser_scope[comm]
-                    usage_count.setdefault(comm, 0)
-                    usage_count[comm] += 1
-                    comm_args,l_after_macro = consume_args(l_after_macro)
+                    l_before_macro = l[:match.start()]
+                    l_after_macro = l[match.end()-1:]
                     len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
-                    comm_args = ','.join(comm_args)
-
-                    l_in_macro = l[match.start():match.start()+len_of_match]
-
-                    parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
-
-                    if isinstance(comm_obj, str):
-                        # The definition is a format string
-                        eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
-                    else:
-                        # The definition is a function. Protect reserved words
-                        # by calling parser_scope['func'] instead of func.
-                        eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
+                    comm = match.group(1) # the command (macro) name
+                    comm_args = eval_str = ''
                     try:
-                        result = eval(eval_str, parser_scope) or args.dummy
-                    except StopIteration:
-                        result = escape(l_in_macro, 1)
-                    if pending_output:
-                        result = pop_pending_output() + result
-                    if args.verbose >= 3:
-                        print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
-                        print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
-                        print(prefix2,'>>>',eval_str,'==> """%s"""'%result, file=args.errf)
-                except Exception as e:
-                    if isinstance(e, KeyError) and e.args[0]==comm: severity = 2
-                    else:                                           severity = 1
+                        comm_obj = parser_scope[comm]
+                        usage_count.setdefault(comm, 0)
+                        usage_count[comm] += 1
+                        comm_args,l_after_macro = consume_args(l_after_macro)
+                        len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
+                        comm_args = ','.join(comm_args)
 
-                    if args.verbose >= severity:
-                        print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
-                        print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
-                        for s in match.group(0), comm_args, eval_str, repr(e):
-                            if s:
-                                print(prefix2,'!!!',s, file=args.errf)
+                        l_in_macro = l[match.start():match.start()+len_of_match]
 
-                    if args.abort >= severity:
-                        raise
+                        parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
 
-                    # Replace the first prefix by an escape sequence, so that we don't try
-                    # to expand this (failed) macro again. Also adjust l_after_macro so that
-                    # the failed expansion doesn't consume any arguments.
-                    result = escape(match.group(0), 1)
-                    l_after_macro = l[match.end():]
-                l = '%s%s%s' % (l_before_macro,str(result),l_after_macro)
+                        if isinstance(comm_obj, str):
+                            # The definition is a format string
+                            eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
+                        else:
+                            # The definition is a function. Protect reserved words
+                            # by calling parser_scope['func'] instead of func.
+                            eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
+                        try:
+                            result = eval(eval_str, parser_scope) or args.dummy
+                        except StopIteration:
+                            result = escape(l_in_macro, 1)
+                        if pending_output:
+                            result = pop_pending_output() + result
+                        if args.verbose >= 3:
+                            print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
+                            print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
+                            print(prefix2,'>>>',eval_str,'==> """%s"""'%result, file=args.errf)
+                    except Exception as e:
+                        if isinstance(e, KeyError) and e.args[0]==comm: severity = 2
+                        else:                                           severity = 1
 
-            # Replace any escape sequences by the original
-            l = unescape(l)
+                        if args.verbose >= severity:
+                            print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
+                            print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
+                            for s in match.group(0), comm_args, eval_str, repr(e):
+                                if s:
+                                    print(prefix2,'!!!',s, file=args.errf)
 
-        if l:
-            output.append(l)
+                        if args.abort >= severity:
+                            raise
+
+                        # Replace the first prefix by an escape sequence, so that we don't try
+                        # to expand this (failed) macro again. Also adjust l_after_macro so that
+                        # the failed expansion doesn't consume any arguments.
+                        result = escape(match.group(0), 1)
+                        l_after_macro = l[match.end():]
+                    l = '%s%s%s' % (l_before_macro,str(result),l_after_macro)
+
+                # Replace any escape sequences by the original
+                l = unescape(l)
+
+            if l:
+                output.append(l)
 
     return output
 
@@ -693,6 +694,7 @@ def parse_args():
     args.infiles = sys.argv[idx:]
 
 def show_macros():
+    global parser_scope
     builtin_macros = []
     builtin_hidden = []
     macros = []
@@ -724,29 +726,29 @@ def main():
     global args
     parse_args()
 
-    for inf in args.infiles:
-        lines = parse(inf)
-        if args.output:
-            args.outf.writelines(lines)
-    if args.outf not in [sys.stdout, sys.stderr]:
-        args.outf.close()
+    with args.errf:
+        with args.outf:
+            for inf in args.infiles:
+                lines = parse(inf)
+                if args.output:
+                    args.outf.writelines(lines)
 
-    if args.show_macros:
-        show_macros()
+        if args.show_macros:
+            show_macros()
 
-    if args.build_type:
-        def system(cmd):
-            if args.verbose > 0:
-                print('>>>', cmd, file=args.errf)
-            os.system(cmd)
-        if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
-            system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
-                or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
-        else:
-            print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
-            print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
-                % (args.outf_name, args.build_type), file=args.errf)
-            sys.exit(1)
+        if args.build_type:
+            def system(cmd):
+                if args.verbose > 0:
+                    print('>>>', cmd, file=args.errf)
+                os.system(cmd)
+            if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
+                system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
+                    or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
+            else:
+                print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
+                print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
+                    % (args.outf_name, args.build_type), file=args.errf)
+                sys.exit(1)
 
 if __name__ == '__main__':
     main()
