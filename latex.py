@@ -244,7 +244,9 @@ def exec_block(lines):
         args.errf.write(debuglines);
     try:
         exec(lines, parser_scope)
-    except:
+    except Exception as e:
+        global prefix1
+        print(prefix1, repr(e), file=args.errf)
         print(lines, file=args.errf)
         raise
 
@@ -264,6 +266,11 @@ def parse(inf_name):
     with inf:
         for lno,l in enumerate(itertools.chain(inf, [''])):
             lno += 1
+
+            global prefix1, prefix2
+            prefix1 = inf_name+' '+str(lno)+':'
+            prefix2 = ' '*(len(prefix1)-1)+':'
+
 
             # Handle {%@ ... }%@. We need to save up a full block of code before
             # exec'ing.
@@ -313,10 +320,6 @@ def parse(inf_name):
                     continue
 
                 re_string = re.escape(args.macro_prefix)+r'([%s]*)[^%s]'%(args.pattern,args.pattern)
-
-                global prefix1
-                prefix1 = inf_name+' '+str(lno)+':'
-                prefix2 = ' '*(len(prefix1)-1)+':'
 
                 # Run through line repeatedly until no more matches are found. This means
                 # that a macro can use other macros, by repeated expansion.
@@ -630,6 +633,12 @@ def _shell(cmd):
         print(cmd, file=args.errf)
         raise
     return cmd.communicate()[0].decode()
+
+@in_parser_scope('_log')
+def _log(text):
+    global prefix1
+    print(prefix1, text, file=args.errf)
+
 
 ##########################################################################
 # Command-line invocation
