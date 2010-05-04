@@ -115,27 +115,22 @@ def allfig(name, caption, cap_width=''):
 \python
 {%@
 def version():
-    import subprocess
-    abbrev = 7
-    cmd = 'git describe --dirty=+ --all --long --abbrev=%d' % abbrev
-    cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-    ver = str(cmd.communicate()[0].strip())
+    ver = shell_eval('git describe --dirty=+ --all --long').strip()
     if ver[-1] == '+':
-        abbrev += 1
-    ver = ver[-abbrev-2:-1]
+        ver = ver[-8:]
+    else:
+        ver = ver[-7:]
     try:
         # For regression testing purposes.
         ver = _REV
     except:
         pass
     try:
-        cmd = 'git rev-parse --short %s' % BASE_REV
-        cmd = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-        base_ver = str(cmd.communicate()[0].strip())
-        return r'\today{} $\cdot$ \DIFdel{%s} \DIFadd{%s}' % (base_ver, ver)
+        # If BASE_REV is set, output in latexdiff format
+        base_ver = shell_eval('git rev-parse --short '+BASE_REV).strip()
+        return : \today{} $\cdot$ \DIFdel{#(base_ver)} \DIFadd{#(ver)}
     except:
-        return r'\today{} $\cdot$ '+ver
-
+        return : \today{} $\cdot$ #(ver)
 }%@
 
 \date{\today}

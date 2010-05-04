@@ -232,9 +232,20 @@ def unescape(line):
         line = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', line) # ... at the end
         line = line.replace(args.dummy, '') # and finally handle lines with other non-whitespace
         if args.verbose >= 3:
-            global prefix1
-            print(prefix1,'"%s"'%l0.replace('\n',r'\n'),'==>','"%s"'%line.replace('\n',r'\n'), file=args.errf)
+            log('"%s"'%l0.replace('\n',r'\n'), '==>', '"%s"'%line.replace('\n', r'\n'))
     return line
+
+
+_prev_prefix = None
+@in_parser_scope('_log')
+def log(*text):
+    global prefix1, prefix2, _prev_prefix
+    if prefix1 != _prev_prefix:
+        prefix = prefix1
+        _prev_prefix = prefix1
+    else:
+        prefix = prefix2
+    print(prefix, *text, file=args.errf)
 
 
 def exec_block(lines):
@@ -245,8 +256,7 @@ def exec_block(lines):
     try:
         exec(lines, parser_scope)
     except Exception as e:
-        global prefix1
-        print(prefix1, repr(e), file=args.errf)
+        log(repr(e))
         print(lines, file=args.errf)
         raise
 
@@ -270,7 +280,6 @@ def parse(inf_name):
             global prefix1, prefix2
             prefix1 = inf_name+' '+str(lno)+':'
             prefix2 = ' '*(len(prefix1)-1)+':'
-
 
             # Handle {%@ ... }%@. We need to save up a full block of code before
             # exec'ing.
@@ -361,19 +370,19 @@ def parse(inf_name):
                         if pending_output:
                             result = pop_pending_output() + result
                         if args.verbose >= 3:
-                            print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
-                            print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
-                            print(prefix2,'>>>',eval_str,'==> """%s"""'%result, file=args.errf)
+                            log(l.rstrip().replace('\n', r'~'))
+                            log(' '*match.start() + '^'*len_of_match)
+                            log('>>>', eval_str, '==> """%s"""'%result)
                     except Exception as e:
                         if isinstance(e, KeyError) and e.args[0]==comm: severity = 2
                         else:                                           severity = 1
 
                         if args.verbose >= severity:
-                            print(prefix1,l.rstrip().replace('\n',r'~'), file=args.errf)
-                            print(prefix2,' '*match.start()+'^'*len_of_match, file=args.errf)
+                            log(l.rstrip().replace('\n', r'~'))
+                            log(' '*match.start() + '^'*len_of_match)
                             for s in match.group(0), comm_args, eval_str, repr(e):
                                 if s:
-                                    print(prefix2,'!!!',s, file=args.errf)
+                                    log('!!!', s)
 
                         if args.abort >= severity:
                             raise
@@ -622,8 +631,8 @@ def opt_kwargs(func):
         return func(*args, **kwargs)
     return wrapper
 
-@in_parser_scope('_shell')
-def _shell(cmd):
+@in_parser_scope('shell_eval')
+def shell_eval(cmd):
     import subprocess
     if isinstance(cmd, str):
         cmd = cmd.split()
@@ -633,12 +642,6 @@ def _shell(cmd):
         print(cmd, file=args.errf)
         raise
     return cmd.communicate()[0].decode()
-
-@in_parser_scope('_log')
-def _log(text):
-    global prefix1
-    print(prefix1, text, file=args.errf)
-
 
 ##########################################################################
 # Command-line invocation
