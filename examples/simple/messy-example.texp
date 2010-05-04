@@ -12,15 +12,18 @@ The rules:
 
 --- Typical definitions are like the following. These work exactly
 --- the same, frac2 is only useful for simple substitutions though.
-%@frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
+%-frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
+%+parser_scope[r"frac"] = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
 
-%@frac2 = r'\mathrm{%s/%s}'
+%-frac2 = r'\mathrm{%s/%s}'
+%+parser_scope[r"frac2"] = r'\mathrm{%s/%s}'
 
 %@def frac3(x,y):
 %@    return r'\mathrm{%s/%s}'%(x,y)
 
 %@def frac4(x,y):  # see below for explanation
-%@    : \mathrm{#(x)/#(y)}
+%-    : \mathrm{#(x)/#(y)}
+%+    _output(_format(r"""\mathrm{#(x)/#(y)}""") % locals())
 
 --- Macro arguments over multiple lines are ok IFF either the line breaks are
 --- within the enclosing brackets, or line continuations (%) are used. Examples:
@@ -50,19 +53,22 @@ $10^{5.4}$
 
 --- Some syntactic sugar for returning text:
 %@def testme(exp, base='10'):
-%@    : $#(base)^{#(exp)}$
+%-    : $#(base)^{#(exp)}$
+%+    _output(_format(r"""$#(base)^{#(exp)}$""") % locals())
 --- (or equivalently)
 %@def testme(exp, base='10'):
 %@    return _format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
 
 --- This is also allowable to return text from blocks of code, and to define
 --- variables.
-%@name =: \emph{Your name here}
+%-name =: \emph{Your name here}
+%+parser_scope[r"name"] = _format(r"""\emph{Your name here}""") % locals()
 \emph{Your name here}
 
 %@for x in range(3):
 %@    val = str(x)
-%@    : \emph{#(val)}
+%-    : \emph{#(val)}
+%+    _output(_format(r"""\emph{#(val)}""") % locals())
 \emph{0}
 \emph{1}
 \emph{2}
@@ -72,16 +78,22 @@ $10^{5.4}$
 --- '_(r"<text>", local_args=locals())', which replaces '#(x)' with '%(x)s'
 --- in <text>, and outputs <text>%locals.
 %@def autotable(f,rows,caption=None):
-%@  rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
-%@  _(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
-%@  :\toprule
-%@  _(rows[0])
-%@  :\midrule
-%@  _(rows[1:])
-%@  :\bottomrule
-%@  :\end{matrix}
-%@  if caption:
-%@    :\caption{#(caption)}
+%@    rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
+%@    _output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
+%-    :\toprule
+%+    _output(_format(r"""\toprule""") % locals())
+%@    _output(rows[0])
+%-    :\midrule
+%+    _output(_format(r"""\midrule""") % locals())
+%@    for row in rows[1:]:
+%@        _output(row)
+%-    :\bottomrule
+%+    _output(_format(r"""\bottomrule""") % locals())
+%-    :\end{matrix}
+%+    _output(_format(r"""\end{matrix}""") % locals())
+%@    if caption:
+%-        :\caption{#(caption)}
+%+        _output(_format(r"""\caption{#(caption)}""") % locals())
 
 --- This input:
 \ autotable{rc}{
@@ -101,23 +113,29 @@ a & f & f\\
 
 --- Working around python reserved words: These are allowed in *plain assignments* only.
 --- like this:
-%@def = r'Definition:'
-%@del = r'\nabla'
+%-def = r'Definition:'
+%+parser_scope[r"def"] = r'Definition:'
+%-del = r'\nabla'
+%+parser_scope[r"del"] = r'\nabla'
 
 --- The same technique can be used to create macros that contain characters that aren't
 --- legal in identifiers in python ('*').
 --- If you want to use this for functions, use lambda or aliases or
 --- whatever. The following definitions are all equivalent.
 
-%@def* = lambda x: "Definition: "+x
+%-def* = lambda x: "Definition: "+x
+%+parser_scope[r"def*"] = lambda x: "Definition: "+x
 Definition: this
 
 %@def _def(x):
-%@    : Definition: #(x)
-%@def* = _def
+%-    : Definition: #(x)
+%+    _output(_format(r"""Definition: #(x)""") % locals())
+%-def* = _def
+%+parser_scope[r"def*"] = _def
 Definition: this
 
-%@def* = r'Definition: %s'
+%-def* = r'Definition: %s'
+%+parser_scope[r"def*"] = r'Definition: %s'
 Definition: this
 
 --- Other uses of reserved words must use the scope dict explicitly:

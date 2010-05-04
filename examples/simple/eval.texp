@@ -3,24 +3,28 @@
 % Eval is by default not visible as a macro due to the underline in
 % the name (underline is considered as a separator). Make it available
 % by binding to the macro name 'py':
-%@py = _eval
+%-py = _eval
+%+parser_scope[r"py"] = _eval
 
 $1+3/5 = 1.6$
 
 % We can even use the empty string as macro name. This is still fairly safe,
 % (b) it is even more uncommon that the '...' part is a valid python expression.
-%@ = _eval
+%- = _eval
+%+parser_scope[r""] = _eval
 
 $2+4/6 = 2.66666666667$
 
 % The following is escaped, and hence not eval'ed.
-%@escape = _escape
+%-escape = _escape
+%+parser_scope[r"escape"] = _escape
 $3+5/7 = @{3+5/7}$
 
 % Another way is to specify that expansion only happens if there is exactly
 % one argument (that is, ignore wrong argument count instead of raising an
 % exception).
-%@ = lambda *args: len(args)==1 and _eval(args[0]) or _ignore()
+%- = lambda *args: len(args)==1 and _eval(args[0]) or _ignore()
+%+parser_scope[r""] = lambda *args: len(args)==1 and _eval(args[0]) or _ignore()
 $2+4/6 = 2.66666666667$
 $2+4/6 = @{2+4/6}{}$
 
@@ -30,7 +34,8 @@ $2+4/6 = @{2+4/6}{}$
 % in standard python. How to --- for example --- delete the macro named ''?
 % Two ways: Assign the '_ignore' function, or delete it from parser_scope
 % directly. That is, either of the following two directives is sufficient:
-%@ = _ignore
+%- = _ignore
+%+parser_scope[r""] = _ignore
 %@del parser_scope['']
 
 % Note, however, that KeyErrors are normally reported so that missing macro

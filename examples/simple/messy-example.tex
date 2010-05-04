@@ -77,16 +77,17 @@ or
 --- in <text>, and outputs <text>%locals.
 {%@
 def autotable(f,rows,caption=None):
-  rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
-  _(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
-  :\toprule
-  _(rows[0])
-  :\midrule
-  _(rows[1:])
-  :\bottomrule
-  :\end{matrix}
-  if caption:
-    :\caption{#(caption)}
+    rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
+    _output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
+    :\toprule
+    _output(rows[0])
+    :\midrule
+    for row in rows[1:]:
+        _output(row)
+    :\bottomrule
+    :\end{matrix}
+    if caption:
+        :\caption{#(caption)}
 }%@
 
 --- This input:

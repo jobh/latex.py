@@ -134,18 +134,10 @@ def format(s):
     s = replace_re.sub(replace_with, s)
     return s
 
-@in_parser_scope('_')
-def output(strs, local_args=None, append=True):
-    if strs:
-        global pending_output
-        if isinstance(strs, str):
-            strs = [strs.strip().lstrip()]
-        if local_args:
-            strs = [format(s) % local_args for s in strs]
-        if (append):
-            pending_output.extend(strs)
-        else:
-            return '\n'.join(strs)
+@in_parser_scope('_output')
+def output(s):
+    pending_output.append(s)
+
 ###################################################################
 
 # Return one argument, formatted as a python string.
@@ -185,21 +177,22 @@ def consume_args(l):
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
+    # Convert and format RHS literal strings
     #    return : \vec{#(x)}
-    #--> return _(r'\vec{#(x)}', local_args=locals(), append=False)
-    # Only at beginning of line:
+    #--> return _format(r"""\vec{#(x)}""" % locals()
     #    del = : \nabla
-    #--> del = _(r'\nabla', local_args=locals(), append=False)
-    (re.compile(r'^([%s]*\s*=|\s*return)\s*:\s*(\S.*)$'%args.pattern),
-     r'\1 _(r"""\2""", local_args=locals(), append=False)'),
-    #    del = r'\nabla'
-    #--> parser_scope[r"del"] = r'\nabla'
+    #--> del = _format(r"""\nabla""") % locals()
+    (re.compile(r'^(\s*([%s]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
+     r'\1 _format(r"""\3""") % locals()'),
+    # Convert reserved words. Only at beginning of line (outer scope).
+    #    del = _format(r"""\nabla"") % locals()
+    #--> parser_scope[r"del"] = ...
     (re.compile(r'^([%s]*)\s*='%args.pattern),
      r'parser_scope[r"\1"] ='),
     #    : \vec{#(x)}
-    #--> _(r'\vec{#(x)}', local_args=locals()
+    #--> _output(r"""\vec{%(x)s}""" % locals())
     (re.compile(r'^(\s*):\s*(.*)$'),
-     r'\1_(r"""\2""", local_args=locals())'), 
+     r'\1_output(_format(r"""\2""") % locals())'), 
     ]
 
 def fixup_line(l):
@@ -293,16 +286,27 @@ def parse(inf_name):
                     lines = ''
                     l = pop_pending_output()
                 else:
-                    lines += fixup_line(l);
+                    new_l = fixup_line(l)
+                    lines += new_l
                     if args.show_blocks:
-                        output.append(args.block_prefix+l)
+                        if l == new_l:
+                            output.append(args.block_prefix+l)
+                        else:
+                            output.append('%-'+l)
+                            output.append('%+'+new_l)
                     continue
 
             # Handle %@ lines. We need to save up a full block before exec'ing.
             if l.startswith(args.block_prefix):
-                lines += fixup_line(l[len(args.block_prefix):])
+                l = l[len(args.block_prefix):]
+                new_l = fixup_line(l)
+                lines += new_l
                 if args.show_blocks:
-                    output.append(l)
+                    if l == new_l:
+                        output.append(args.block_prefix+l)
+                    else:
+                        output.append('%-'+l)
+                        output.append('%+'+new_l)
                 continue
             elif lines:
                 exec_block(lines)
