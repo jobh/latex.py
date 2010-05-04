@@ -17,4 +17,4 @@ messy-example.texp: messy-example.tex
 	$(latex.py) -B -o $@ $<
 
 various.texp: various.tex
-	$(latex.py) -o $@ $<
+	$(latex.py) -L -o $@ $<
