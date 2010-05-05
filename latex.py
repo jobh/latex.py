@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-r"""usage: python parse.py [args] file [file2 ...]
+r'''usage: latex.py [args] file [file2 ...]
+OR:    python2.6 latex.py ...  (if python3 is not installed)
 
 Latex preprocessor. There are three main use cases:
 
 1) Write macros in python. Because it's simpler? More powerful libraries?
    Use '@' instead of '\' as macro prefix. Typical build process:
-     python parse.py -i macros.py -o manuscript.pdf manuscript.tex
+       python parse.py -i macros.py -o manuscript.pdf manuscript.tex
 
 2) Expand user-defined macros in text, because some journals don't like these.
    Uses '\' as macro prefix, but replaces as many as possible with their
-   expansions. Add "-e 'input=ignore(input)'" after -L to leave \input statements
-   alone (they are still parsed for \newcommand; '-I input' or '-e input=ignore'
-   stops parsing too).
-     python parse.py -L -o manuscript.texp manuscript.tex
+   expansions. Add "-e 'input=ignore(input)'" after -L to leave \input
+   statements alone (they are still parsed for \newcommand; '-I input' or
+   '-e input=ignore' stops parsing too).
+       python parse.py -L -o manuscript.texp manuscript.tex
 
 3) Parse a latex file to determine its dependencies, for use in makefiles etc.
-     deps=$(python parse.py \
-            -P includegraphics:1:%s.pdf \
-            -P input:1:%s.tex \
-            -P bibliography:1:%s.bib \
-            manuscript.tex)
+       deps=$(python parse.py \
+              -P includegraphics:1:%s.pdf \
+              -P input:1:%s.tex \
+              -P bibliography:1:%s.bib \
+              manuscript.tex)
    (or if python macros are used:)
-     deps=$(python parse.py -i macros.py manuscript.tex | python parse.py \
-            -P includegraphics:1:%s.pdf \
-            -P bibliography:1:%s.bib)
+       deps=$(python parse.py -i macros.py manuscript.tex | python parse.py \
+              -P includegraphics:1:%s.pdf \
+              -P bibliography:1:%s.bib)
 
 === Optional arguments ===
 
@@ -76,9 +77,21 @@ Latex preprocessor. There are three main use cases:
                          '@gmail' will just raise KeyError and be left alone.
                          Alternatively, use '-v 1' to ignore all KeyErrors.
 
+    -V
+    --version            Print the version number. The major (integer) part
+                         is bumped when incompatible changes are made.
     -h
     --help               Print this text and more
-"""
+
+=== Known bugs / limitations ===
+
+Text passed to macros may not contain three double quotes (""") in a row or
+end with a bare backslash (\).
+'''
+
+# Make python2.6 work like python3
+#from __future__ import unicode_literals
+from __future__ import print_function, absolute_import, division
 
 import sys
 import os
@@ -89,10 +102,10 @@ import itertools
 ########## Global variables ###############################
 parser_scope = {}
 parser_scope['parser_scope'] = parser_scope
-def in_parser_scope(s):
+def in_parser_scope(s=None):
     def wrap(f):
         global parser_scope
-        parser_scope[s] = f
+        parser_scope[s or f.__code__.co_name] = f
         return f
     return wrap
 
@@ -112,6 +125,7 @@ class args:
     escape       = '{_}'
     dummy        = '{__}'
     pattern      = r'a-zA-Z0-9*'
+    version      = 1.0
 
 usage_count = {}
 parser_scope['usage_count'] = usage_count
@@ -250,7 +264,9 @@ def exec_block(lines):
         exec(lines, parser_scope)
     except Exception as e:
         log(repr(e))
+        print('------ code block: -------', file=args.errf)
         print(lines, file=args.errf)
+        print('--------------------------', file=args.errf)
         raise
 
 def parse(inf_name):
@@ -583,7 +599,7 @@ def ignore(*args):
     else:
         raise StopIteration
 
-@in_parser_scope('is_sentence_start')
+@in_parser_scope()
 def is_sentence_start():
     global parser_scope
     b = parser_scope['current_match'][0]
@@ -593,7 +609,7 @@ def is_sentence_start():
     else:
         return True
 
-@in_parser_scope('upcase_at_start')
+@in_parser_scope()
 def upcase_at_start(func_or_str):
     """Decorator (or function, if called with string) to upcase first character
     if it is at the beginning of a sentence."""
@@ -619,7 +635,7 @@ def match_has_optional_parameter():
     m = parser_scope['current_match'][1]
     return re.match(r'.[%s]*[[]'%args.pattern, m)
     
-@in_parser_scope('opt_kwargs')
+@in_parser_scope()
 def opt_kwargs(func):
     """Decorator to allow calling a function like \func[key=val,other=foo]{text}."""
     def wrapper(*args):
@@ -635,7 +651,7 @@ def opt_kwargs(func):
         return func(*args, **kwargs)
     return wrapper
 
-@in_parser_scope('shell_eval')
+@in_parser_scope()
 def shell_eval(cmd):
     import subprocess
     if isinstance(cmd, str):
@@ -646,6 +662,14 @@ def shell_eval(cmd):
         print(cmd, file=args.errf)
         raise
     return cmd.communicate()[0].decode()
+
+@in_parser_scope()
+def expect_version(expected):
+    if args.version < expected:
+        raise RuntimeError('latex.py v%g too old; %g required' % (args.version, expected))
+    if int(args.version) > int(expected):
+        log('latex.py v%g too new; expected version %d.x' % (args.version, expected))
+
 
 ##########################################################################
 # Command-line invocation
@@ -702,6 +726,9 @@ def parse_args():
                 set_print_mode(cmd[0], int(cmd[1])-1, cmd[2])
         elif arg == '-h' or arg == '--help':
             print(__doc__)
+            sys.exit(0)
+        elif arg in ['-V', '--version']:
+            print(args.version)
             sys.exit(0)
         else:
             break
