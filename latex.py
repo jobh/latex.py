@@ -100,9 +100,10 @@ import os
 import subprocess
 import re
 import itertools
+import collections
 
 ########## Global variables ###############################
-parser_scope = type('UserDict', (dict,), {})()
+parser_scope = type('Dict', (dict,), {})()
 parser_scope['parser_scope'] = parser_scope
 def in_parser_scope(s=None):
     def wrap(f):
@@ -128,9 +129,9 @@ class args:
     escape       = '{_}'
     dummy        = '{__}'
     pattern      = r'a-zA-Z0-9*'
-    version      = 1.0
+    version      = 1.01
 
-usage_count = {}
+usage_count = collections.defaultdict(int)
 parser_scope['usage_count'] = usage_count
 
 ########## Used by the @out definitions (see above) ###############
@@ -346,7 +347,7 @@ def parse(inf_name):
                     if idx != None:
                         collected = l[:idx]
                         continue
-                if l.count('{') > l.count('}'):
+                if l.count('{')>l.count('}') or l.count('[')>l.count(']'):
                     # balanced braces
                     collected = l
                     continue
@@ -368,17 +369,17 @@ def parse(inf_name):
                     comm = match.group(1) # the command (macro) name
                     comm_args = eval_str = ''
                     try:
-                        comm_obj = parser_scope[comm]
-                        usage_count.setdefault(comm, 0)
-                        usage_count[comm] += 1
                         comm_args,l_after_macro = consume_args(l_after_macro)
                         len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                         comm_args = ','.join(comm_args)
 
                         l_in_macro = l[match.start():match.start()+len_of_match]
+                        parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro),
+                                                         l_in_macro,
+                                                         l_after_macro]
 
-                        parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro), l_in_macro, l_after_macro]
-
+                        comm_obj = parser_scope[comm]
+                        usage_count[comm] += 1
                         if isinstance(comm_obj, str):
                             # The definition is a format string
                             eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
@@ -411,10 +412,9 @@ def parse(inf_name):
                             raise
 
                         # Replace the first prefix by an escape sequence, so that we don't try
-                        # to expand this (failed) macro again. Also adjust l_after_macro so that
-                        # the failed expansion doesn't consume any arguments.
-                        result = escape(match.group(0), 1)
-                        l_after_macro = l[match.end():]
+                        # to expand this (failed) macro again.
+                        result = escape(l_in_macro, 1)
+
                     l = '%s%s%s' % (l_before_macro,str(result),l_after_macro)
 
                 # Replace any escape sequences by the original
@@ -669,9 +669,9 @@ def shell_eval(cmd):
 @in_parser_scope()
 def expect_version(expected):
     if args.version < expected:
-        raise RuntimeError('latex.py v%g too old; %g required' % (args.version, expected))
+        raise RuntimeError('latex.py v%.2f is too old; %.2f required' % (args.version, expected))
     if int(args.version) > int(expected):
-        log('latex.py v%g too new; expected version %d.x' % (args.version, expected))
+        log('latex.py v%.2f may be too new; expected version %.2f' % (args.version, expected))
 
 
 ##########################################################################
@@ -733,7 +733,7 @@ def parse_args():
             print(__doc__)
             sys.exit(0)
         elif arg in ['-V', '--version']:
-            print(args.version)
+            print('%.2f'%args.version)
             sys.exit(0)
         else:
             break
@@ -770,15 +770,24 @@ def show_macros():
     print('User:', ', '.join(sorted(macros)), file=args.errf)
 
 
+import contextlib
+@contextlib.contextmanager
+def closing(f):
+    try:
+        yield f
+    finally:
+        if not f.isatty(): # <-- here
+            f.close()
+
 def main():
     global args
     parse_args()
 
-    with args.errf:
+    with closing(args.errf):
         if args.two_pass:
             for inf in args.infiles:
                 parse(inf)
-        with args.outf:
+        with closing(args.outf):
             for inf in args.infiles:
                 lines = parse(inf)
                 if args.output:
@@ -799,7 +808,6 @@ def main():
                 print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
                 print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
                     % (args.outf_name, args.build_type), file=args.errf)
-                sys.exit(1)
 
 if __name__ == '__main__':
     main()
