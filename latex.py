@@ -89,6 +89,11 @@ Latex preprocessor. There are three main use cases:
 
 Text passed to macros may not contain three double quotes (""") in a row or
 end with a bare backslash (\).
+
+=== License, author ===
+
+latex.py was written in 2010 by Joachim B Haga (jobh@simula.no).
+It is licensed under GPL v2 (or later).
 '''
 
 # Make python2.6 work like python3
