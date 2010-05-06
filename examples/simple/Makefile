@@ -18,3 +18,6 @@ messy-example.texp: messy-example.tex
 
 various.texp: various.tex
 	$(latex.py) -L -o $@ $<
+
+missing.texp: missing.tex
+	$(latex.py) -o $@ $<

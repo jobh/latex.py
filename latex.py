@@ -76,7 +76,9 @@ Latex preprocessor. There are three main use cases:
                          that this is not needed for correctness, since
                          '@gmail' will just raise KeyError and be left alone.
                          Alternatively, use '-v 1' to ignore all KeyErrors.
-
+    -2
+    --two-pass           Two passes over the input file, allowing the first
+                         pass to collect information for the whole file.
     -V
     --version            Print the version number. The major (integer) part
                          is bumped when incompatible changes are made.
@@ -100,7 +102,7 @@ import re
 import itertools
 
 ########## Global variables ###############################
-parser_scope = {}
+parser_scope = type('UserDict', (dict,), {})()
 parser_scope['parser_scope'] = parser_scope
 def in_parser_scope(s=None):
     def wrap(f):
@@ -120,6 +122,7 @@ class args:
     output       = True
     show_macros  = False
     show_blocks  = False
+    two_pass     = False
     block_prefix = '%@'
     macro_prefix = '@'
     escape       = '{_}'
@@ -685,7 +688,7 @@ def parse_args():
     idx = 1
     while idx < len(sys.argv):
         arg = sys.argv[idx]
-        if arg == '-o' or arg == '--output':
+        if arg in ['-o', '--output']:
             idx += 1
             args.outf_name = sys.argv[idx]
             args.base_name, ext = os.path.splitext(args.outf_name)
@@ -693,29 +696,29 @@ def parse_args():
                 args.build_type = ext[1:]
                 args.outf_name = args.base_name+'.texp'
             args.outf = open(args.outf_name, 'w')
-        elif arg == '-v' or arg == '--verbose':
+        elif arg in ['-v', '--verbose']:
             idx += 1
             args.verbose = int(sys.argv[idx])
-        elif arg == '-M' or arg == '--show-macros':
+        elif arg in ['-M', '--show-macros']:
             args.show_macros = True
-        elif arg == '-B' or arg == '--show-blocks':
+        elif arg in ['-B', '--show-blocks']:
             args.show_blocks = True
-        elif arg == '-a' or arg == '--abort':
+        elif arg in ['-a', '--abort']:
             idx += 1
             args.abort = int(sys.argv[idx])
-        elif arg == '-i' or arg == '--include':
+        elif arg in ['-i', '--include']:
             idx += 1
             code = map(fixup_line, open(sys.argv[idx]).readlines())
             exec_block(''.join(code))
-        elif arg == '-e' or arg == '--expression':
+        elif arg in ['-e', '--expression']:
             idx += 1
             code = fixup_line(sys.argv[idx])
             exec_block(code)
-        elif arg == '-q' or arg == '--quiet':
+        elif arg in ['-q', '--quiet']:
             args.output = False
-        elif arg == '-L' or arg == '--parse-latex-commands':
+        elif arg in ['-L', '--parse-latex-commands']:
             set_latex_parse_mode()
-        elif arg == '-P' or arg == '--print-cmd':
+        elif arg in ['-P', '--print-cmd']:
             idx += 1
             cmd = sys.argv[idx].split(':')
             if len(cmd) == 1:
@@ -724,7 +727,9 @@ def parse_args():
                 set_print_mode(cmd[0], int(cmd[1])-1)
             elif len(cmd) == 3:
                 set_print_mode(cmd[0], int(cmd[1])-1, cmd[2])
-        elif arg == '-h' or arg == '--help':
+        elif arg in ['-2', '--two-pass']:
+            args.two_pass = True
+        elif arg in ['-h', '--help']:
             print(__doc__)
             sys.exit(0)
         elif arg in ['-V', '--version']:
@@ -770,6 +775,9 @@ def main():
     parse_args()
 
     with args.errf:
+        if args.two_pass:
+            for inf in args.infiles:
+                parse(inf)
         with args.outf:
             for inf in args.infiles:
                 lines = parse(inf)
