@@ -23,38 +23,64 @@ Since then, it has grown a bit. There are now three main use cases:
               -P bibliography:1:%s.bib \
               manuscript.tex)
 
-As a simple case, the following can be put in the .tex file,
+In the .tex file, lines beginning with '%@', or between '{%@' and '}%@', 
+form a block of python code. As a simple case, the following can be put in 
+the .tex file,
 
----
-%@def vec(x):
-%@    return r'\hat{%s}' % x
-%@A = r'\mathrm{A}'                        [1]
----
-
-and now @vec{@A} (or \vec{\A}, if the -L flag is used) is expanded in the text.
-
-There are various shortcuts to make this more pleasant to write and use. The 
-following are two alternative ways to write the definitions above:
-
----
-%@def vec(x):
-%@    return :\hat{#(x)}                   [2]
-%@A = :\mathrm{A}
 ---
 {%@
-vec = :\hat{%s}                            [3]
-A   = :\mathrm{A}
+def vec(x):
+    return r'\hat{%s}' % x
+A = r'\mathrm{A}'                        [1]
 }%@
 ---
+
+and now \vec{\A} is expanded to \hat{\mathrm{A}} in the text (assuming 
+the -L flag is used).
+
+There are various shortcuts to make this more pleasant to write. The 
+following are two equivalent ways to write the definitions above:
+
+---
+{%@
+def vec(x):
+    return : \hat{#(x)}                  [2]
+A =: \mathrm{A}
+}%@
+---
+{%@
+vec =: \hat{%s}                          [3]
+A   =: \mathrm{A}
+}%@
+---
+\newcommand{\vec}[1]{\hat{#1}}           [4]
+\newcommand{\A}{\mathrm{A}}
 
 (The ':' syntax is not pure python obviously. For the curious, line [2] is
 converted to 
     return r"""\hat{%(x)s}""" % locals()
-Furthermore, a macro can either be a string as in lines [1] and [3], which 
-is processed as <macro> % <args>, or a callable which is processed as 
-<macro>(<args>).)
+Furthermore, a macro can either be a string (as in lines [1] and [3]), or
+a function (as in [2]). Strings are formatted using the arguments to the
+macro.
+
+[4]: Yes, parse.py understands \newcommand when the -L flag is given. It
+can be used on an unmodified latex file to expand all user-defined macros.
+
+
+Another short example:
+
+---
+%@py = _eval                             [5]
+\title{Proving that $2+2=@py{2+2}$
+---
+
+The line [5] is required to make the builtin macro _eval visible, since
+'_' is not allowed in macro names. All builtins contain '_' and must
+explicitly be given a name.
+
 
 See the examples/ directory for other examples.
+
 
 latex.py was written in 2010 by Joachim B Haga (jobh@simula.no).
 It is licensed under GPL v2 (or later).

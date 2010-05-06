@@ -108,12 +108,21 @@ import itertools
 import collections
 
 ########## Global variables ###############################
+
+# Make parser_scope an inherited type instead of pure dict.
+# This allows the user to override __missing__.
 parser_scope = type('Dict', (dict,), {})()
 parser_scope['parser_scope'] = parser_scope
+
 def in_parser_scope(s=None):
+    """Decorator which adds the function (or class) to the
+    parser_scope namespace."""
     def wrap(f):
         global parser_scope
-        parser_scope[s or f.__code__.co_name] = f
+        parser_scope_name = s or f.__code__.co_name
+        if not '_' in parser_scope_name:
+            raise RuntimeError('Builtins in parser scope must contain "_"')
+        parser_scope[parser_scope_name] = f
         return f
     return wrap
 
@@ -139,7 +148,8 @@ class args:
 usage_count = collections.defaultdict(int)
 parser_scope['usage_count'] = usage_count
 
-########## Used by the @out definitions (see above) ###############
+##### Support functions for the ':' string syntax (see fixup_line) ######
+
 pending_output = []
 def pop_pending_output():
     global pending_output
@@ -161,7 +171,7 @@ def format(s):
 def output(s):
     pending_output.append(s)
 
-###################################################################
+#### Parsing arguments. Not easily done with regexps because of possible nesting. #####
 
 # Return one argument, formatted as a python string.
 def consume_arg(l):
@@ -197,6 +207,8 @@ def consume_args(l):
         (arg,l) = consume_arg(l[pos:])
         args.append(arg)
 
+####### Support functions for exec'ing code blocks #############
+
 # Some text substitutions on the line, to simplify the rest of the parsing.
 # These are NOT applied to in-line macros, only to python definitions etc.
 replacers = [
@@ -223,8 +235,24 @@ def fixup_line(l):
         l = replace_re.sub(replace_with, l)
     return l
 
-# Returns the index of a comment / line continuation, or None if not found
+def exec_block(lines):
+    global args, parser_scope
+    if args.verbose >= 3:
+        debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
+        args.errf.write(debuglines);
+    try:
+        exec(lines, parser_scope)
+    except Exception as e:
+        log(repr(e))
+        print('------ code block: -------', file=args.errf)
+        print(lines, file=args.errf)
+        print('--------------------------', file=args.errf)
+        raise
+
+######### Misc. support functions #################
+
 def comment_idx(l):
+    """Return the index of a comment / line continuation, or None if not found"""
     if l[0] == '%':
         return 0
     cmatch = re.search(r'[^\\]%', l)
@@ -264,19 +292,7 @@ def log(*text):
     print(prefix, *text, file=args.errf)
 
 
-def exec_block(lines):
-    global args, parser_scope
-    if args.verbose >= 3:
-        debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
-        args.errf.write(debuglines);
-    try:
-        exec(lines, parser_scope)
-    except Exception as e:
-        log(repr(e))
-        print('------ code block: -------', file=args.errf)
-        print(lines, file=args.errf)
-        print('--------------------------', file=args.errf)
-        raise
+######### The actual parsing / preprocessing takes place here #########
 
 def parse(inf_name):
     global args, parser_scope
@@ -430,24 +446,29 @@ def parse(inf_name):
 
     return output
 
-#################### Definitions used by the process-latex-commands mode ##################
+########## Definitions used by the process-latex-commands (-L) mode ###########
 
-# Three cases to handle:
+# Parsing latex command definitions. There are three cases to handle, and the
+# idiosyncratic placement of optional parameters makes it complicated to do
+# in the current framework. But hey, it's a challenge... The definition is
+# done in up to three stages:
+#                                       ret:      remaining text:
 # 1) \newcommand{\x}{text}
 #   1: newcommand('\x', 'text')     --> ''
 # 2) \newcommand{\x}[2]{text $#1^#2$}
-#   1: newcommand('\x')             --> '\x'
+#   1: newcommand('\x')             --> '\x'  --> '\x[2]{text$#1^#2$}'
 #   2: x('text $#1^#2$', '2')       --> ''
 # 3) \newcommand{\x}[3][+]{$#2^{#1#3}$}
-#   1: newcommand('\x')             --> '\x'
-#   2: x('2')                       --> '\x'
+#   1: newcommand('\x')             --> '\x'  --> '\x[3][+]{$#2^{#1#3}$}'
+#   2: x('3')                       --> '\x'  --> '\x[+]{$#2^{#1#3}$}'
 #   3: x('$#2^{#1#3}$', '+')        --> ''
 #
 # The last one, for example, results in a definition roughly equivalent to
 # def x(arg1, arg2, arg3='+'):
-#     return '$%(2)s^{%(1)s%(2)s}$' % {'2':arg1, '3':arg2, '1':arg3}
+#     return '$%(2)s^{%(1)s%(3)s}$' % {'2':arg1, '3':arg2, '1':arg3}
 
 class latex_new_comm(object):
+    r"""A class to hold the state of the \newcommand definition."""
     def __init__(self, name, definition=None):
         if definition:
             # Case (1.1)
@@ -503,29 +524,23 @@ class latex_new_comm(object):
         self.set_definition(definition)
         self.finished = True
 
-def latex_newcommand(name, definition=None):
+def latex_newcommand(name, definition=None, redefine=False):
     global args, parser_scope
+    # Check if the command is one that is explicitly ignored by user
     if parser_scope.get(name[1:]) == ignore:
         if args.verbose >= 3:
-            print(r'++ Ignoring \newcommand{%s}'%name, file=sys.stderr)
+            log(r'Ignoring \newcommand{%s}'%name)
         ignore()
     command = latex_new_comm(name, definition)
     old_cmd = parser_scope.get(name[1:])
-    if old_cmd and args.verbose >= 2:
-        print(r'++ Redefining %s'%name, file=sys.stderr)
+    if not redefine and old_cmd and args.verbose >= 2 and args.two_pass != 2:
+        log('Redefining %s'%name)
     parser_scope[name[1:]] = command
     if not command.finished:
         return name             # finish definition in new_comm.__call__
 
 def latex_renewcommand(name, definition=None):
-    global args, parser_scope
-    if parser_scope.get(name[1:]) == ignore:
-        if args.verbose >= 3:
-            print(r'++ Ignoring \renewcommand{%s}'%name, file=sys.stderr)
-        ignore()
-    if name[1:] in parser_scope:
-        del parser_scope[name[1:]]
-    return latex_newcommand(name, definition)
+    return latex_newcommand(name, definition, redefine=True)
 
 def latex_input(name):
     lines = parse(name+'.tex')
@@ -535,15 +550,20 @@ def latex_input(name):
     lines = map(escape, lines)
     return ''.join(lines)
 
+
+# _latex holds various info about the document; the document class, 
+# any loaded packages, the current environment stack, ...
 _latex = {'environment': []}
 parser_scope['_latex'] = _latex
 
+@in_parser_scope()
 def latex_usepackage(names, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
     for name in names.split(','):
         _latex[name] = opt
     ignore()
+@in_parser_scope()
 def latex_documentclass(name, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
@@ -551,20 +571,22 @@ def latex_documentclass(name, opt=None):
     _latex['documentclass_opts'] = opt
     ignore()
 
+@in_parser_scope()
 def latex_begin(name, *args):
     _latex['environment'].append(name)
     ignore()
+@in_parser_scope()
 def latex_end(name):
     expected_name = _latex['environment'].pop()
     if expected_name != name:
         global prefix1
-        print(prefix1, 'Expected "\end{%s}", not "%s"'%(expected_name, name), file=args.errf)
+        log(prefix1, 'Expected "\end{%s}", not "%s"'%(expected_name, name))
     ignore()
 
 def set_latex_parse_mode():
     global args, parser_scope
     parser_scope['newcommand']    = latex_newcommand
-    parser_scope['renewcommand']  = latex_newcommand
+    parser_scope['renewcommand']  = latex_renewcommand
     parser_scope['input']         = latex_input
     parser_scope['usepackage']    = latex_usepackage
     parser_scope['documentclass'] = latex_documentclass
@@ -596,6 +618,7 @@ def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
 ##########################################################################
 
+############### Utility functions ###############
 @in_parser_scope('_ignore')
 def ignore(*args):
     if len(args) == 1 and hasattr(args[0], '__call__'):
@@ -792,6 +815,7 @@ def main():
         if args.two_pass:
             for inf in args.infiles:
                 parse(inf)
+            args.two_pass = 2
         with closing(args.outf):
             for inf in args.infiles:
                 lines = parse(inf)
