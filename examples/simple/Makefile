@@ -21,3 +21,6 @@ various.texp: various.tex
 
 missing.texp: missing.tex
 	$(latex.py) -o $@ $<
+
+multi_prefix.texp: multi_prefix.tex
+	$(latex.py) -L -o $@ $<

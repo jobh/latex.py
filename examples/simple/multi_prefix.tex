@@ -1,0 +1,74 @@
+\documentclass{article}
+
+% Use another prefix for certain macros.
+
+{%@
+nabla = _escape(r'\vec{\nabla}}')
+at_prefix = with_prefix('@')
+u = at_prefix(ensure_math(r'\vec{u}'))
+Pf = at_prefix(ensure_math(r'P_\text{f}'))
+S = at_prefix(ensure_math('S'))
+}%@
+
+\begin{document}
+
+We can use this secondary prefix for, e.g, marking unknowns in equations to
+ensure they always use the same notation (even in plain text). We could have done this with
+the standard prefix as well, but see below...
+
+\begin{equation}
+@S\dot{@Pf} \alpha \nabla \cdot \dot{@u} = @q
+\end{equation}
+
+But then we have to define them all, even the plain ones (@S and @q). Maybe this will work:
+
+% Make any @X for undefined X return just 'X'
+{%@
+@at_prefix
+def __missing__(key, *args):
+   if args:
+       _ignore()
+   usage_count[key] += 1
+   return ensure_math(key)()
+del S
+}%@
+
+Now the equation is
+\begin{equation}
+@S\dot{@Pf} \alpha \nabla \cdot \dot{@u} = @q,
+\end{equation}
+with @q as a source term.
+
+Yes! But there's a problem:
+
+jobh@simula.no, jobh@{simula.no}
+
+We can work around this by protecting the part after @ with brackets, like above.
+This can even be invisible in the output, like so:
+
+% Make a macro '' (empty string) that just returns its escaped (single) argument
+%@ = at_prefix(lambda *args: len(args)==1 and _escape('@')+args[0] or _ignore())
+
+Try again:
+We can work around this by protecting the part after @ with brackets, like above.
+
+jobh@simula.no, jobh@{simula.no}
+
+So this approach is probably not a good idea. But what if you have a symbol on
+your keyboard that is never used elsewhere, it may be worthwhile (I have at least two: £,¬).
+
+{%@
+def _var(x):
+    return with_prefix('¬')(ensure_math(x))
+@_var
+def __missing__(key, *args):
+   return key
+R = _var(r'\mathcal{R}')
+}%@
+
+\begin{equation}
+(¬x+¬y)^2 = ¬x^2+¬y^2+2¬x¬y,
+\end{equation}
+for any ¬x and ¬y in ¬R.
+
+\end{document}

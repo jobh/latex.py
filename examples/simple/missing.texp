@@ -1,11 +1,10 @@
 % This function is called for all undefined macros.
 
 
-
 P
 \vec{P}
 
 \mathcal{x}
 \vec{\mathcal{x}}
 
-\vec{\vec{P}}
+@**Pf

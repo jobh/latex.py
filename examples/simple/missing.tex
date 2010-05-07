@@ -1,18 +1,15 @@
 % This function is called for all undefined macros.
 % In this example, it is used to convert @*f -> \vec{@f}.
-
 {%@
-def __missing__(the_dict, key):
-    if key[0] == '*':
-        real_cmd = current_match[1].replace('*', '', 1)
-        return lambda *args: r'\vec{%s}' % real_cmd
+def __missing__(name, *args, **kwargs):
+    if name and name[0] == '*' and name[1:] in parser_scope:
+        return r'\vec{%s}' % current_match[1].replace('*','',1)
     else:
-        raise KeyError(key)
-parser_scope.__class__.__missing__ = __missing__
-}%@
+        _ignore()
+}%@ 
 
 %@Pf =: P
-%@M = lambda x: r'\mathcal{x}'
+%@M = lambda x: r'\mathcal{%s}' % x
 
 @Pf
 @*Pf

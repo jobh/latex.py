@@ -109,9 +109,7 @@ import collections
 
 ########## Global variables ###############################
 
-# Make parser_scope an inherited type instead of pure dict.
-# This allows the user to override __missing__.
-parser_scope = type('Dict', (dict,), {})()
+parser_scope = {}
 parser_scope['parser_scope'] = parser_scope
 
 def in_parser_scope(s=None):
@@ -139,9 +137,9 @@ class args:
     show_blocks  = False
     two_pass     = False
     block_prefix = '%@'
-    macro_prefix = '@'
-    escape       = '{_}'
-    dummy        = '{__}'
+    macro_prefix = ['@']
+    escape       = ('{_}', '{__}', '{___}', '{____}')
+    dummy        = '{^}'
     pattern      = r'a-zA-Z0-9*'
     version      = 1.01
 
@@ -259,21 +257,25 @@ def comment_idx(l):
     return cmatch and cmatch.start()+1
 
 @in_parser_scope('_escape')
-def escape(line, count=-1):
+def escape(line):
     global args
-    return line.replace(args.macro_prefix, args.escape, count)
+    for a,b in zip(args.macro_prefix, args.escape):
+        line = line.replace(a,b)
+    return line
 def unescape(line):
     global args
-    line = line.replace(args.escape, args.macro_prefix)
+    for a,b in zip(args.escape, args.macro_prefix):
+        line = line.replace(a,b)
     # Remove space taken by macros that return nothing. It is complicated because we
     # do not want macros that expand to nothing to introduce new totally blank lines,
-    # but blank lines in the original text should be preserved. Note also that l may
+    # but blank lines in the original text should be preserved. Note also that line may
     # at this point contain multiple linebreaks.
     if args.dummy in line:
         l0 = line
-        line = re.sub(r'^(\s*('+args.dummy+r'\s*)+\n)+',  r'', line)   # lines at the start
-        line = re.sub(r'\n(\s*('+args.dummy+r'\s*)+\n)+', r'\n', line) # ... in the middle
-        line = re.sub(r'(\n\s*('+args.dummy+r'\s*)+)+$',  r'\n', line) # ... at the end
+        dummy = re.escape(args.dummy)
+        line = re.sub(r'^(\s*('+dummy+r'\s*)+\n)+',  r'', line)   # lines at the start
+        line = re.sub(r'\n(\s*('+dummy+r'\s*)+\n)+', r'\n', line) # ... in the middle
+        line = re.sub(r'(\n\s*('+dummy+r'\s*)+)+$',  r'\n', line) # ... at the end
         line = line.replace(args.dummy, '') # and finally handle lines with other non-whitespace
         if args.verbose >= 3:
             log('"%s"'%l0.replace('\n',r'\n'), '==>', '"%s"'%line.replace('\n', r'\n'))
@@ -361,7 +363,7 @@ def parse(inf_name):
             # Handle in-line macros. We need to save up enough lines to be certain that
             # all arguments are present (i.e., until braces are balanced and 
             # line continuations (%) are eaten).
-            if args.macro_prefix in l:
+            if any(prefix in l for prefix in args.macro_prefix):
                 if '%' in l:
                     # line continuations?
                     idx = comment_idx(l)
@@ -373,7 +375,8 @@ def parse(inf_name):
                     collected = l
                     continue
 
-                re_string = re.escape(args.macro_prefix)+r'([%s]*)[^%s]'%(args.pattern,args.pattern)
+                re_string = r'[%s]([%s]*)[^%s]' \
+                    % (re.escape(''.join(args.macro_prefix)), args.pattern, args.pattern)
 
                 # Run through line repeatedly until no more matches are found. This means
                 # that a macro can use other macros, by repeated expansion.
@@ -398,9 +401,17 @@ def parse(inf_name):
                         parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro),
                                                          l_in_macro,
                                                          l_after_macro]
-
-                        comm_obj = parser_scope[comm]
+                        comm_obj = parser_scope.get(comm)
+                        if comm_obj is None:
+                            comm_obj = parser_scope.get('__missing__')
+                            if comm_obj is not None:
+                                comm_args = 'r"""%s""",'%comm + comm_args
+                                comm = '__missing__'
+                        req_prefix = getattr(comm_obj, 'prefix', args.macro_prefix[0])
+                        if comm_obj is None or not l_in_macro.startswith(req_prefix):
+                            raise KeyError(comm)
                         usage_count[comm] += 1
+
                         if isinstance(comm_obj, str):
                             # The definition is a format string
                             eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
@@ -411,7 +422,7 @@ def parse(inf_name):
                         try:
                             result = eval(eval_str, parser_scope) or args.dummy
                         except StopIteration:
-                            result = escape(l_in_macro, 1)
+                            result = escape(l_in_macro[0]) + l_in_macro[1:]
                         if pending_output:
                             result = pop_pending_output() + result
                         if args.verbose >= 3:
@@ -434,7 +445,7 @@ def parse(inf_name):
 
                         # Replace the first prefix by an escape sequence, so that we don't try
                         # to expand this (failed) macro again.
-                        result = escape(l_in_macro, 1)
+                        result = escape(l_in_macro[0]) + l_in_macro[1:]
 
                     l = '%s%s%s' % (l_before_macro,str(result),l_after_macro)
 
@@ -593,7 +604,7 @@ def set_latex_parse_mode():
     parser_scope['begin']         = latex_begin
     parser_scope['end']           = latex_end
     args.verbose = 1
-    args.macro_prefix = '\\'
+    args.macro_prefix = ['\\']
 ############################################################################
 
 ############### Definitions used by the dependency-printing mode ###############
@@ -701,6 +712,33 @@ def expect_version(expected):
     if int(args.version) > int(expected):
         log('latex.py v%.2f may be too new; expected version %.2f' % (args.version, expected))
 
+
+@in_parser_scope()
+def with_prefix(pre):
+    if not pre in args.macro_prefix:
+        args.macro_prefix.extend(pre)
+    def decorator(func):
+        if isinstance(func, str):
+            s = func
+            func = lambda *args: s%args
+        func.prefix = pre
+        return func
+    return decorator
+
+
+@in_parser_scope()
+def ensure_math(func):
+    is_math = ['equation', 'eqnarray', 'align', 'equation*', 'eqnarray*']
+    if isinstance(func, str):
+        s = func
+        func = lambda *args: s % args
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        for env in reversed(_latex['environment']):
+            if env in is_math:
+                return result
+        return r'\ensuremath{%s}' % result
+    return wrapper
 
 ##########################################################################
 # Command-line invocation
