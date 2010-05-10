@@ -4,10 +4,10 @@
 
 {%@
 nabla = _escape(r'\vec{\nabla}}')
-at_prefix = with_prefix('@')
-u = at_prefix(ensure_math(r'\vec{u}'))
-Pf = at_prefix(ensure_math(r'P_\text{f}'))
-S = at_prefix(ensure_math('S'))
+with _scope('@'):
+    u = ensure_math(r'\vec{u}')
+    Pf = ensure_math(r'P_\text{f}')
+    S = ensure_math('S')
 }%@
 
 \begin{document}
@@ -22,15 +22,18 @@ the standard prefix as well, but see below...
 
 But then we have to define them all, even the plain ones (@S and @q). Maybe this will work:
 
-% Make any @X for undefined X return just 'X'
+% Make any @X for undefined X return just 'X'. Note that __missing__ is a common function
+% across all scopes (since it contains underscores) and thus must check explicitly which
+% scope it is called in.
+
 {%@
-@at_prefix
 def __missing__(key, *args):
-   if args:
+   if not key or args or current_match()[0] != '@':
        _ignore()
    usage_count[key] += 1
    return ensure_math(key)()
-del S
+with _scope('@'):
+    del S  # Don't need it anymore, it's covered by __missing__
 }%@
 
 Now the equation is
@@ -41,34 +44,40 @@ with @q as a source term.
 
 Yes! But there's a problem:
 
-jobh@simula.no, jobh@{simula.no}
+jobh@simula.no, jobh@{}simula.no, jobh@{simula.no}
 
 We can work around this by protecting the part after @ with brackets, like above.
 This can even be invisible in the output, like so:
 
 % Make a macro '' (empty string) that just returns its escaped (single) argument
-%@ = at_prefix(lambda *args: len(args)==1 and _escape('@')+args[0] or _ignore())
+%@get_scope('@')[''] = lambda *args: len(args)==1 and _escape('@')+args[0] or _ignore()
 
 Try again:
 We can work around this by protecting the part after @ with brackets, like above.
 
-jobh@simula.no, jobh@{simula.no}
+jobh@simula.no, jobh@{}simula.no, jobh@{simula.no}
 
-So this approach is probably not a good idea. But what if you have a symbol on
-your keyboard that is never used elsewhere, it may be worthwhile (I have at least two: £,¬).
+On my keyboard, there are several seldom-used symbols available, including '¬'
+and '£', but these would be a problem for collaborators with different keyboard
+layouts. Maybe '#' is an option, if we are careful to avoid code listings?
 
 {%@
-def _var(x):
-    return with_prefix('¬')(ensure_math(x))
-@_var
-def __missing__(key, *args):
-   return key
-R = _var(r'\mathcal{R}')
+with _scope('#'):
+    @ensure_math
+    def __missing__(key, *args):
+        if (not key) or args or (current_match()[0] != '#'):
+            _ignore()
+        for env in _latex['environment']:
+           if env in ['lstlisting', 'verbatim']:
+               _ignore()
+        usage_count[key] += 1
+        return key
+    R = ensure_math(r'\mathcal{R}')
 }%@
 
 \begin{equation}
-(¬x+¬y)^2 = ¬x^2+¬y^2+2¬x¬y,
+(#x+#y)^2 = #x^2+#y^2+2#x#y,
 \end{equation}
-for any ¬x and ¬y in ¬R.
+for any #x and #y in #R.
 
 \end{document}

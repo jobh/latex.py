@@ -34,7 +34,7 @@ $2+4/6 = @{2+4/6}{}$
 % Two ways: Assign the '_ignore' function, or delete it from parser_scope
 % directly. That is, either of the following two directives is sufficient:
 %@ = _ignore
-%@del parser_scope['']
+%@del get_scope()['']
 
 % Note, however, that KeyErrors are normally reported so that missing macro
 % definitions are identified. We can turn this off for now.

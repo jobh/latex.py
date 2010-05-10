@@ -13,10 +13,10 @@ The rules:
 --- Typical definitions are like the following. These work exactly
 --- the same, frac2 is only useful for simple substitutions though.
 %-frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
-%+parser_scope[r"frac"] = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
+%+get_scope()[r"frac"] = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
 
 %-frac2 = r'\mathrm{%s/%s}'
-%+parser_scope[r"frac2"] = r'\mathrm{%s/%s}'
+%+get_scope()[r"frac2"] = r'\mathrm{%s/%s}'
 
 %@def frac3(x,y):
 %@    return r'\mathrm{%s/%s}'%(x,y)
@@ -45,12 +45,6 @@ $10^{5.4}$
 or
 $10^{5.4}$
 
---- The command prefix etc can be redefined. This can be handy to
---- expand macros in a latex file without changing them. See also '-L' mode, which does
---- this better, by also understanding \newcommand and \input.
-%@_args.macro_prefix='\\'
-%@_args.verbose = 1
-
 --- Some syntactic sugar for returning text:
 %@def testme(exp, base='10'):
 %-    : $#(base)^{#(exp)}$
@@ -62,7 +56,7 @@ $10^{5.4}$
 --- This is also allowable to return text from blocks of code, and to define
 --- variables.
 %-name =: \emph{Your name here}
-%+parser_scope[r"name"] = _format(r"""\emph{Your name here}""") % locals()
+%+get_scope()[r"name"] = _format(r"""\emph{Your name here}""") % locals()
 \emph{Your name here}
 
 %@for x in range(3):
@@ -96,7 +90,7 @@ $10^{5.4}$
 %+        _output(_format(r"""\caption{#(caption)}""") % locals())
 
 --- This input:
-\ autotable{rc}{
+(at)autotable{rc}{
 x & y & z\\
 r & b & x\\
 a & f & f
@@ -114,9 +108,9 @@ a & f & f\\
 --- Working around python reserved words: These are allowed in *plain assignments* only.
 --- like this:
 %-def = r'Definition:'
-%+parser_scope[r"def"] = r'Definition:'
+%+get_scope()[r"def"] = r'Definition:'
 %-del = r'\nabla'
-%+parser_scope[r"del"] = r'\nabla'
+%+get_scope()[r"del"] = r'\nabla'
 
 --- The same technique can be used to create macros that contain characters that aren't
 --- legal in identifiers in python ('*').
@@ -124,19 +118,19 @@ a & f & f\\
 --- whatever. The following definitions are all equivalent.
 
 %-def* = lambda x: "Definition: "+x
-%+parser_scope[r"def*"] = lambda x: "Definition: "+x
+%+get_scope()[r"def*"] = lambda x: "Definition: "+x
 Definition: this
 
 %@def _def(x):
 %-    : Definition: #(x)
 %+    _output(_format(r"""Definition: #(x)""") % locals())
 %-def* = _def
-%+parser_scope[r"def*"] = _def
+%+get_scope()[r"def*"] = _def
 Definition: this
 
 %-def* = r'Definition: %s'
-%+parser_scope[r"def*"] = r'Definition: %s'
+%+get_scope()[r"def*"] = r'Definition: %s'
 Definition: this
 
 --- Other uses of reserved words must use the scope dict explicitly:
-%@del parser_scope['def*']
+%@del get_scope()['def*']

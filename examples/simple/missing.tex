@@ -2,8 +2,9 @@
 % In this example, it is used to convert @*f -> \vec{@f}.
 {%@
 def __missing__(name, *args, **kwargs):
-    if name and name[0] == '*' and name[1:] in parser_scope:
-        return r'\vec{%s}' % current_match[1].replace('*','',1)
+    if name and name[0] == '*' and name[1:] in get_scope():
+#        print(get_scope()['current_match'])
+        return r'\vec{%s}' % current_match().replace('*','',1)
     else:
         _ignore()
 }%@ 

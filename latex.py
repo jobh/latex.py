@@ -106,23 +106,100 @@ import subprocess
 import re
 import itertools
 import collections
+import contextlib
 
-########## Global variables ###############################
+########## Scopes ###############################
 
-parser_scope = {}
-parser_scope['parser_scope'] = parser_scope
+# Note that the scopes are a bit weird. In effect, attributes containing
+# underscores are shared between all scopes. See 
+# examples/simple/multi_prefix.tex for example of use.
+
+main_parser_scope = {}
+parser_scopes = {} # populated in get_scope()
 
 def in_parser_scope(s=None):
     """Decorator which adds the function (or class) to the
-    parser_scope namespace."""
+    parser scopes."""
     def wrap(f):
-        global parser_scope
+        global main_parser_scope
         parser_scope_name = s or f.__code__.co_name
         if not '_' in parser_scope_name:
             raise RuntimeError('Builtins in parser scope must contain "_"')
-        parser_scope[parser_scope_name] = f
+        main_parser_scope[parser_scope_name] = f
         return f
     return wrap
+
+@in_parser_scope()
+def get_scope(x=None):
+    global main_parser_scope, parser_scopes
+    if not x:
+        return main_parser_scope
+    if not parser_scopes:
+        parser_scopes[x] = main_parser_scope
+    if not x in parser_scopes:
+        new_scope = main_parser_scope.copy()
+        remove_macros_from(new_scope)
+        parser_scopes[x] = new_scope
+        if not x in args.macro_prefix:
+            args.macro_prefix.append(x)
+    else:
+        new_scope = parser_scopes[x]
+    if new_scope != main_parser_scope:
+        # ensure the hidden attributes are the same everywhere
+        copy_hidden(main_parser_scope, new_scope)
+    return new_scope
+
+@in_parser_scope('_scope')
+@contextlib.contextmanager
+def scope(x):
+    orig_scope = get_scope()
+    new_scope = get_scope(x)
+    if orig_scope == new_scope:
+        yield orig_scope
+    else:
+        scope_copy = orig_scope.copy()
+        try:
+            # set macros in the running scope to those in x
+            remove_macros_from(orig_scope)
+            copy_macros(new_scope, orig_scope)
+            yield orig_scope
+        finally:
+            # make x identical to the running scope (including hidden)
+            new_scope.clear()
+            copy_macros(orig_scope, new_scope)
+            # reset macros in the running scope (but leave hidden alone)
+            remove_macros_from(orig_scope)
+            copy_macros(scope_copy, orig_scope)
+
+@contextlib.contextmanager
+def eval_scope(x):
+    global main_parser_scope
+    orig_scope = get_scope()
+    new_scope = get_scope(x)
+    try:
+        main_parser_scope = new_scope
+        yield new_scope
+    finally:
+        main_parser_scope = orig_scope
+
+@in_parser_scope()
+def current_match(idx=1):
+    return _current_match[idx]
+
+def remove_macros_from(s):
+    for k in list(s.keys()):
+        if not '_' in k:
+            del s[k]
+def copy_macros(fro, to):
+    for k in fro.keys():
+        if not '_' in k:
+            to[k] = fro[k]
+def copy_hidden(fro, to):
+    for k in fro.keys():
+        if '_' in k:
+            to[k] = fro[k]
+
+########## Arguments #####################
 
 @in_parser_scope('_args')
 class args:
@@ -141,10 +218,10 @@ class args:
     escape       = ('{_}', '{__}', '{___}', '{____}')
     dummy        = '{^}'
     pattern      = r'a-zA-Z0-9*'
-    version      = 1.01
+    version      = 2.00
 
 usage_count = collections.defaultdict(int)
-parser_scope['usage_count'] = usage_count
+get_scope()['usage_count'] = usage_count
 
 ##### Support functions for the ':' string syntax (see fixup_line) ######
 
@@ -219,9 +296,9 @@ replacers = [
      r'\1 _format(r"""\3""") % locals()'),
     # Convert reserved words. Only at beginning of line (outer scope).
     #    del = _format(r"""\nabla"") % locals()
-    #--> parser_scope[r"del"] = ...
+    #--> get_scope()[r"del"] = ...
     (re.compile(r'^([%s]*)\s*='%args.pattern),
-     r'parser_scope[r"\1"] ='),
+     r'get_scope()[r"\1"] ='),
     #    : \vec{#(x)}
     #--> _output(r"""\vec{%(x)s}""" % locals())
     (re.compile(r'^(\s*):\s*(.*)$'),
@@ -234,12 +311,11 @@ def fixup_line(l):
     return l
 
 def exec_block(lines):
-    global args, parser_scope
     if args.verbose >= 3:
         debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
         args.errf.write(debuglines);
     try:
-        exec(lines, parser_scope)
+        exec(lines, get_scope())
     except Exception as e:
         log(repr(e))
         print('------ code block: -------', file=args.errf)
@@ -297,8 +373,6 @@ def log(*text):
 ######### The actual parsing / preprocessing takes place here #########
 
 def parse(inf_name):
-    global args, parser_scope
-
     output = []
     lines = ''
     collected = ''
@@ -398,37 +472,41 @@ def parse(inf_name):
                         comm_args = ','.join(comm_args)
 
                         l_in_macro = l[match.start():match.start()+len_of_match]
-                        parser_scope['current_match'] = [''.join(output[-1:])+unescape(l_before_macro),
-                                                         l_in_macro,
-                                                         l_after_macro]
-                        comm_obj = parser_scope.get(comm)
-                        if comm_obj is None:
-                            comm_obj = parser_scope.get('__missing__')
-                            if comm_obj is not None:
-                                comm_args = 'r"""%s""",'%comm + comm_args
-                                comm = '__missing__'
-                        req_prefix = getattr(comm_obj, 'prefix', args.macro_prefix[0])
-                        if comm_obj is None or not l_in_macro.startswith(req_prefix):
-                            raise KeyError(comm)
-                        usage_count[comm] += 1
+                        m_prefix = l_in_macro[0]
+                        with eval_scope(m_prefix):
+                            global _current_match
+                            _current_match = [''.join(output[-1:])+unescape(l_before_macro),
+                                              l_in_macro,
+                                              l_after_macro]
+                            comm_obj = get_scope().get(comm)
+                            if comm_obj is None:
+                                comm_obj = get_scope().get('__missing__')
+                                if comm_obj is not None:
+                                    comm_args = 'r"""%s""",'%comm + comm_args
+                                    comm = '__missing__'
+                            if comm_obj is None:
+                                raise KeyError(comm)
+                            usage_count[comm] += 1
 
-                        if isinstance(comm_obj, str):
-                            # The definition is a format string
-                            eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
-                        else:
-                            # The definition is a function. Protect reserved words
-                            # by calling parser_scope['func'] instead of func.
-                            eval_str = 'parser_scope[r"%s"](%s)'%(comm, comm_args)
-                        try:
-                            result = eval(eval_str, parser_scope) or args.dummy
-                        except StopIteration:
-                            result = escape(l_in_macro[0]) + l_in_macro[1:]
-                        if pending_output:
-                            result = pop_pending_output() + result
-                        if args.verbose >= 3:
-                            log(l.rstrip().replace('\n', r'~'))
-                            log(' '*match.start() + '^'*len_of_match)
-                            log('>>>', eval_str, '==> """%s"""'%result)
+                            if isinstance(comm_obj, str):
+                                # The definition is a format string
+                                eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
+                            else:
+                                # The definition is a function. Protect reserved words
+                                # by calling get_scope()['func'] instead of func.
+                                eval_str = 'get_scope()[r"%s"](%s)'%(comm, comm_args)
+
+                            try:
+                                result = eval(eval_str, get_scope()) or args.dummy
+                            except StopIteration:
+                                result = escape(l_in_macro[0]) + l_in_macro[1:]
+
+                            if pending_output:
+                                result = pop_pending_output() + result
+                            if args.verbose >= 3:
+                                log(l.rstrip().replace('\n', r'~'))
+                                log(' '*match.start() + '^'*len_of_match)
+                                log('>>>', eval_str, '==> """%s"""'%result)
                     except Exception as e:
                         if isinstance(e, KeyError) and e.args[0]==comm: severity = 2
                         else:                                           severity = 1
@@ -536,17 +614,16 @@ class latex_new_comm(object):
         self.finished = True
 
 def latex_newcommand(name, definition=None, redefine=False):
-    global args, parser_scope
     # Check if the command is one that is explicitly ignored by user
-    if parser_scope.get(name[1:]) == ignore:
+    if get_scope().get(name[1:]) == ignore:
         if args.verbose >= 3:
             log(r'Ignoring \newcommand{%s}'%name)
         ignore()
     command = latex_new_comm(name, definition)
-    old_cmd = parser_scope.get(name[1:])
+    old_cmd = get_scope().get(name[1:])
     if not redefine and old_cmd and args.verbose >= 2 and args.two_pass != 2:
         log('Redefining %s'%name)
-    parser_scope[name[1:]] = command
+    get_scope()[name[1:]] = command
     if not command.finished:
         return name             # finish definition in new_comm.__call__
 
@@ -565,7 +642,7 @@ def latex_input(name):
 # _latex holds various info about the document; the document class, 
 # any loaded packages, the current environment stack, ...
 _latex = {'environment': []}
-parser_scope['_latex'] = _latex
+get_scope()['_latex'] = _latex
 
 @in_parser_scope()
 def latex_usepackage(names, opt=None):
@@ -595,16 +672,15 @@ def latex_end(name):
     ignore()
 
 def set_latex_parse_mode():
-    global args, parser_scope
-    parser_scope['newcommand']    = latex_newcommand
-    parser_scope['renewcommand']  = latex_renewcommand
-    parser_scope['input']         = latex_input
-    parser_scope['usepackage']    = latex_usepackage
-    parser_scope['documentclass'] = latex_documentclass
-    parser_scope['begin']         = latex_begin
-    parser_scope['end']           = latex_end
     args.verbose = 1
-    args.macro_prefix = ['\\']
+    args.macro_prefix[0] = '\\'
+    get_scope()['newcommand']    = latex_newcommand
+    get_scope()['renewcommand']  = latex_renewcommand
+    get_scope()['input']         = latex_input
+    get_scope()['usepackage']    = latex_usepackage
+    get_scope()['documentclass'] = latex_documentclass
+    get_scope()['begin']         = latex_begin
+    get_scope()['end']           = latex_end
 ############################################################################
 
 ############### Definitions used by the dependency-printing mode ###############
@@ -623,9 +699,8 @@ def latex_print(n, format, chained_cmd):
         return one_printer
 
 def set_print_mode(cmd, n=None, format='%s'):
-    global args, parser_scope
     set_latex_parse_mode()
-    parser_scope[cmd] = latex_print(n, format, parser_scope.get(cmd))
+    get_scope()[cmd] = latex_print(n, format, get_scope().get(cmd))
     args.output = False
 ##########################################################################
 
@@ -643,8 +718,7 @@ def ignore(*args):
 
 @in_parser_scope()
 def is_sentence_start():
-    global parser_scope
-    b = parser_scope['current_match'][0]
+    b = current_match(0)
     # Check if text preceding match ends with a character that is not '.' or ':'
     if re.search(r'[^:.\s]\s*$', b):
         return False
@@ -673,8 +747,7 @@ def do_eval(x):
         ignore()
 
 def match_has_optional_parameter():
-    global parser_scope, args
-    m = parser_scope['current_match'][1]
+    m = current_match()
     return re.match(r'.[%s]*[[]'%args.pattern, m)
     
 @in_parser_scope()
@@ -711,19 +784,6 @@ def expect_version(expected):
         raise RuntimeError('latex.py v%.2f is too old; %.2f required' % (args.version, expected))
     if int(args.version) > int(expected):
         log('latex.py v%.2f may be too new; expected version %.2f' % (args.version, expected))
-
-
-@in_parser_scope()
-def with_prefix(pre):
-    if not pre in args.macro_prefix:
-        args.macro_prefix.extend(pre)
-    def decorator(func):
-        if isinstance(func, str):
-            s = func
-            func = lambda *args: s%args
-        func.prefix = pre
-        return func
-    return decorator
 
 
 @in_parser_scope()
@@ -808,14 +868,13 @@ def parse_args():
     args.infiles = sys.argv[idx:]
 
 def show_macros():
-    global parser_scope
     builtin_macros = []
     builtin_hidden = []
     macros = []
     hidden = []
     glob_vals = list(globals().values())
-    for key,val in parser_scope.items():
-        if val in glob_vals or key in ['current_match', '__builtins__']:
+    for key,val in get_scope().items():
+        if val in glob_vals or key == '__builtins__':
             if '_' in key:
                 builtin_hidden.append(key)
             else:
@@ -835,6 +894,12 @@ def show_macros():
     print('Global:', ', '.join(sorted(builtin_macros)), file=args.errf)
     print('User:', ', '.join(sorted(macros)), file=args.errf)
 
+    for s in args.macro_prefix[1:]:
+        macros = []
+        for key in get_scope(s).keys():
+            if not '_' in key:
+                macros.append(key)
+        print('Scope %s:'%s, ', '.join(sorted(macros)), file=args.errf)
 
 import contextlib
 @contextlib.contextmanager

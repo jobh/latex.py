@@ -49,12 +49,6 @@ The rules:
 or
 @testme{5.4}{10}
 
---- The command prefix etc can be redefined. This can be handy to
---- expand macros in a latex file without changing them. See also '-L' mode, which does
---- this better, by also understanding \newcommand and \input.
-%@_args.macro_prefix='\\'
-%@_args.verbose = 1
-
 --- Some syntactic sugar for returning text:
 %@def testme(exp, base='10'):
 %@    : $#(base)^{#(exp)}$
@@ -65,7 +59,7 @@ or
 --- This is also allowable to return text from blocks of code, and to define
 --- variables.
 %@name =: \emph{Your name here}
-\name
+@name
 
 %@for x in range(3):
 %@    val = str(x)
@@ -91,13 +85,13 @@ def autotable(f,rows,caption=None):
 }%@
 
 --- This input:
-\ autotable{rc}{
+(at)autotable{rc}{
 x & y & z\\
 r & b & x\\
 a & f & f
 }
 --- expands into:
-\autotable{rc}{
+@autotable{rc}{
 x & y & z\\
 r & b & x\\
 a & f & f
@@ -114,15 +108,15 @@ a & f & f
 --- whatever. The following definitions are all equivalent.
 
 %@def* = lambda x: "Definition: "+x
-\def*{this}
+@def*{this}
 
 %@def _def(x):
 %@    : Definition: #(x)
 %@def* = _def
-\def*{this}
+@def*{this}
 
 %@def* = r'Definition: %s'
-\def*{this}
+@def*{this}
 
 --- Other uses of reserved words must use the scope dict explicitly:
-%@del parser_scope['def*']
+%@del get_scope()['def*']

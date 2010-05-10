@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 for file in $(git ls-files | grep '\.texp$'); do
     dir=${file%/*}
     target=${file##*/}
@@ -9,6 +7,6 @@ for file in $(git ls-files | grep '\.texp$'); do
     rm -f $target
     echo -n "$dir> "
     make $target
-    git diff $target |cat && echo OK
+    PAGER= git diff --exit-code $target || { echo "! $file failed"; exit 1; }
     popd >/dev/null
 done

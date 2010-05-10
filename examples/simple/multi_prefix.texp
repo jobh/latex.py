@@ -15,6 +15,9 @@ S\dot{P_\text{f}} \alpha \vec{\nabla}} \cdot \dot{\vec{u}} = @q
 
 But then we have to define them all, even the plain ones (\ensuremath{S} and @q). Maybe this will work:
 
+% across all scopes (since it contains underscores) and thus must check explicitly which
+% scope it is called in.
+
 
 Now the equation is
 \begin{equation}
@@ -24,9 +27,9 @@ with \ensuremath{q} as a source term.
 
 Yes! But there's a problem:
 
-jobh\ensuremath{simula}.no, jobh@{simula.no}
+jobh\ensuremath{simula}.no, jobh@{}simula.no, jobh@{simula.no}
 
-We can work around this by protecting the part after \ensuremath{} with brackets, like above.
+We can work around this by protecting the part after @ with brackets, like above.
 This can even be invisible in the output, like so:
 
 % Make a macro '' (empty string) that just returns its escaped (single) argument
@@ -34,10 +37,11 @@ This can even be invisible in the output, like so:
 Try again:
 We can work around this by protecting the part after @ with brackets, like above.
 
-jobh\ensuremath{simula}.no, jobh@simula.no
+jobh\ensuremath{simula}.no, jobh@simula.no, jobh@simula.no
 
-So this approach is probably not a good idea. But what if you have a symbol on
-your keyboard that is never used elsewhere, it may be worthwhile (I have at least two: £,¬).
+On my keyboard, there are several seldom-used symbols available, including '¬' and '£',
+but these would be a problem for collaborators with different keyboard layouts; choose
+your poison. Maybe '#' is an option, if we are careful to avoid code listings?
 
 
 \begin{equation}
