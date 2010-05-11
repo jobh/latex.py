@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 r'''usage: latex.py [args] file [file2 ...]
-OR:    python2.6 latex.py ...  (if python3 is not installed)
 
 Latex preprocessor. There are three main use cases:
 
@@ -25,6 +24,8 @@ Latex preprocessor. There are three main use cases:
        deps=$(python parse.py -i macros.py manuscript.tex | python parse.py \
               -P includegraphics:1:%s.pdf \
               -P bibliography:1:%s.bib)
+
+Note that python3 syntax is used.
 
 === Optional arguments ===
 
@@ -97,7 +98,7 @@ It is licensed under GPL v2 (or later).
 '''
 
 # Make python2.6 work like python3
-#from __future__ import unicode_literals
+#from __future__ import unicode_literals # doesn't work right: r'\u' gives error
 from __future__ import print_function, absolute_import, division
 
 import sys
@@ -942,4 +943,8 @@ def main():
                     % (args.outf_name, args.build_type), file=args.errf)
 
 if __name__ == '__main__':
+    v = eval('%s.%s' % sys.version_info[:2])
+    if v < 2.6:
+        print('python version 2.6 or higher required (%.1f found)' % v, file=sys.stderr)
+        sys.exit(1)
     main()
