@@ -1,26 +1,27 @@
+PYTHON := python3
 latex.py := ../../latex.py
 
 graphs.pdf: graphs.tex $(wildcard data/*.pdf)
-	$(latex.py) -o $@ $<
+	$(PYTHON) $(latex.py) -o $@ $<
 graphs.texp: graphs.tex
-	$(latex.py) -o $@ $<
+	$(PYTHON) $(latex.py) -o $@ $<
 
 expand-macros.pdf: expand-macros.tex
-	$(latex.py) -L -o $@ $<
+	$(PYTHON) $(latex.py) -L -o $@ $<
 expand-macros.texp: expand-macros.tex
-	$(latex.py) -L -o $@ $<
+	$(PYTHON) $(latex.py) -L -o $@ $<
 
 eval.texp: eval.tex
-	$(latex.py) -B -o $@ $<
+	$(PYTHON) $(latex.py) -B -o $@ $<
 
 messy-example.texp: messy-example.tex
-	$(latex.py) -B -o $@ $<
+	$(PYTHON) $(latex.py) -B -o $@ $<
 
 various.texp: various.tex
-	$(latex.py) -L -o $@ $<
+	$(PYTHON) $(latex.py) -L -o $@ $<
 
 missing.texp: missing.tex
-	$(latex.py) -o $@ $<
+	$(PYTHON) $(latex.py) -o $@ $<
 
 multi_prefix.texp: multi_prefix.tex
-	$(latex.py) -L -o $@ $<
+	$(PYTHON) $(latex.py) -L -o $@ $<

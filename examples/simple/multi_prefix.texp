@@ -39,9 +39,9 @@ We can work around this by protecting the part after @ with brackets, like above
 
 jobh\ensuremath{simula}.no, jobh@simula.no, jobh@simula.no
 
-On my keyboard, there are several seldom-used symbols available, including '¬' and '£',
-but these would be a problem for collaborators with different keyboard layouts; choose
-your poison. Maybe '#' is an option, if we are careful to avoid code listings?
+On my keyboard, there are several seldom-used symbols available, including '¬'
+and '£', but these would be a problem for collaborators with different keyboard
+layouts. Maybe '#' is an option, if we are careful to avoid code listings?
 
 
 \begin{equation}

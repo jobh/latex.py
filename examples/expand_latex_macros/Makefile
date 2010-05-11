@@ -1,11 +1,12 @@
+PYTHON := python3
 latex.py := ../../latex.py
-PDFDEPS := $(shell $(latex.py) -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
+PDFDEPS := $(shell $(PYTHON) $(latex.py) -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
 EPSDEPS := $(patsubst %.pdf,%.eps,$(PDFDEPS))
 
 report.pdf: report.tex $(PDFDEPS)
-	$(latex.py) -L -o $@ $<
+	$(PYTHON) $(latex.py) -L -o $@ $<
 report.texp: report.tex
-	$(latex.py) -L -e "_REV='xxxxxx'" -o $@ $<
+	$(PYTHON) $(latex.py) -L -e "_REV='v1.0'" -o $@ $<
 
 view: report.pdf
 	exec evince report.pdf 2>/dev/null &
@@ -38,9 +39,9 @@ REV := diff
 diff-base.tex: $(wildcard .git/refs/tags/$(REV))
 	git cat-file blob $(REV):report.tex > $<
 diff-curr.texp: report.tex
-	$(latex.py) -L -e "BASE_REV='$(REV)'" -o $@ $<
+	$(PYTHON) $(latex.py) -L -e "BASE_REV='$(REV)'" -o $@ $<
 diff-base.texp: diff-base.tex
-	$(latex.py) -L -a 0 -o $@ $<
+	$(PYTHON) $(latex.py) -L -a 0 -o $@ $<
 
 diff.pdf: diff-curr.texp diff-base.texp
 	latexdiff \
@@ -64,7 +65,7 @@ data/%.eps: data/%.tex
 report.ps: report.dvi
 	dvips -o $@ $<
 report.dvi: report.tex $(EPSDEPS)
-	$(latex.py) -L -o $@ $<
+	$(PYTHON) $(latex.py) -L -o $@ $<
 
 sync:
 	git diff --quiet || git commit -a -m "checkpoint"

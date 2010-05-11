@@ -117,16 +117,16 @@ def allfig(name, caption, cap_width=''):
 \python
 {%@
 def version():
-    ver = shell_eval('git describe --dirty=+ --all --long').strip()
+    try:
+        # For regression testing purposes.
+        cmd = 'git describe --all --long %s' % _REV
+    except:
+        cmd = 'git describe --dirty=+ --all --long'
+    ver = shell_eval(cmd).strip()
     if ver[-1] == '+':
         ver = ver[-8:]
     else:
         ver = ver[-7:]
-    try:
-        # For regression testing purposes.
-        ver = _REV
-    except:
-        pass
     try:
         # If BASE_REV is set, output in latexdiff format
         base_ver = shell_eval('git rev-parse --short '+BASE_REV).strip()
