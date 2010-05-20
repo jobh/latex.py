@@ -31,7 +31,7 @@ Note that python3 syntax is used.
 
     -o <file>
     --output <file>      Output filename [stdout]. If extension is .ps, .dvi
-                         or .pdf, build document using latexmk (preprocessed
+                         or .pdf, build this file using *latex (preprocessed
                          file will then be called <basename>.texp).
     -v <level>
     --verbose <level>    0: print nothing, 1: print errors except KeyError,
@@ -911,6 +911,55 @@ def closing(f):
         if not f.isatty(): # <-- here
             f.close()
 
+def in_path(cmd):
+    return any(os.path.exists(os.path.join(d, cmd)) for d in os.environ['PATH'].split(os.pathsep))
+
+def fgrep_file(string, fname):
+    with open(fname) as f:
+        for l in f:
+            if l.startswith(string):
+                return True
+
+def hash_file(fname):
+    import hashlib
+    m = hashlib.md5()
+    with open(fname) as f:
+        for l in f:
+            m.update(l)
+    return m.digest()
+
+def build_latex():
+    """Run *latex/bibtex until .aux file no longer changes (max 5 times)."""
+    global args
+    def system(cmd):
+        if args.verbose > 0:
+            print('>>>', cmd, file=args.errf)
+        return os.system(cmd)
+    if args.build_type == 'dvi':
+        latex = 'latex'
+    else:
+        latex = args.build_type + 'latex'
+    if in_path(latex):
+        try:
+            aux_hash = hash_file('%s.aux' % args.base_name)
+        except:
+            aux_hash = None
+        for i in range(5):
+            if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name)):
+                system("grep -A15 -m1 '^!' %s.log" % args.base_name)
+                break
+            new_hash = hash_file('%s.aux' % args.base_name)
+            if new_hash == aux_hash:
+                break
+            else:
+                aux_hash = new_hash
+            if i == 0 and fgrep_file(r'\bibdata{', '%s.aux' % args.base_name):
+                system('bibtex %s' % args.base_name)
+    else:
+        print('*** Error: "%s" not found in PATH, skipping build.' % latex, file=args.errf)
+        print('*** Use "-o %s" instead, and run latex on that one yourself.' % args.outf_name,
+              file=args.errf)
+
 def main():
     global args
     parse_args()
@@ -928,19 +977,8 @@ def main():
 
         if args.show_macros:
             show_macros()
-
         if args.build_type:
-            def system(cmd):
-                if args.verbose > 0:
-                    print('>>>', cmd, file=args.errf)
-                os.system(cmd)
-            if any(os.path.exists(os.path.join(d,'latexmk')) for d in os.environ['PATH'].split(os.pathsep)):
-                system("latexmk -f -quiet -%s %s" % (args.build_type, args.outf_name)) \
-                    or system("grep -A15 -m1 '^!' %s.log" % args.base_name)
-            else:
-                print('*** Error: "latexmk" not found in PATH, skipping build.', file=args.errf)
-                print('*** Use "-o %s" instead, and run %slatex on that one yourself.' \
-                    % (args.outf_name, args.build_type), file=args.errf)
+            build_latex()
 
 if __name__ == '__main__':
     v = eval('%s.%s' % sys.version_info[:2])
