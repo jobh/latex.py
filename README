@@ -17,7 +17,7 @@ Since then, it has grown a bit. There are now three main use cases:
        python parse.py -L -o manuscript.texp manuscript.tex
 
 3) Parse a latex file to determine its dependencies, for use in makefiles etc.
-       deps=$(python parse.py \
+       deps=$(python parse.py -L \
               -P includegraphics:1:%s.pdf \
               -P input:1:%s.tex \
               -P bibliography:1:%s.bib \

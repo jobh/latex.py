@@ -700,9 +700,8 @@ def latex_print(n, format, chained_cmd):
         return one_printer
 
 def set_print_mode(cmd, n=None, format='%s'):
-    set_latex_parse_mode()
-    get_scope()[cmd] = latex_print(n, format, get_scope().get(cmd))
     args.output = False
+    get_scope()[cmd] = latex_print(n, format, get_scope().get(cmd))
 ##########################################################################
 
 ############### Utility functions ###############

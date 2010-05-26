@@ -1,6 +1,6 @@
 PYTHON := python3
 latex.py := ../../latex.py
-PDFDEPS := $(shell $(PYTHON) $(latex.py) -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
+PDFDEPS := $(shell $(PYTHON) $(latex.py) -L -P includegraphics:1:%s.pdf -P input:1:%s.tex report.tex)
 EPSDEPS := $(patsubst %.pdf,%.eps,$(PDFDEPS))
 
 report.pdf: report.tex $(PDFDEPS)
