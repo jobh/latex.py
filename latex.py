@@ -221,6 +221,12 @@ class args:
     pattern      = r'a-zA-Z0-9*'
     version      = 2.00
 
+    bracket_words  = [r'\left[', r'\right]', 
+                      r'\left{', r'\right}',
+                      r'\{', r'\}']
+    bracket_escape = '{_%d}'
+
+
 usage_count = collections.defaultdict(int)
 get_scope()['usage_count'] = usage_count
 
@@ -261,6 +267,7 @@ def consume_arg(l):
             (arg, rest_of_line) = l[1:pos-1], l[pos:]
             assert not '"""' in arg
             return ('r"""%s"""'%arg, rest_of_line)
+    raise TypeError('Argument not closed')
 
 # Return as many arguments as possible. Ignore spaces between arguments,
 # and allow exactly one optional argument [] if it comes first. The optional
@@ -358,6 +365,14 @@ def unescape(line):
             log('"%s"'%l0.replace('\n',r'\n'), '==>', '"%s"'%line.replace('\n', r'\n'))
     return line
 
+def bracket_escape(line):
+    for i,kw in enumerate(args.bracket_words):
+        line = line.replace(kw, args.bracket_escape%i)
+    return line
+def bracket_unescape(line):
+    for i,kw in enumerate(args.bracket_words):
+        line = line.replace(args.bracket_escape%i, kw)
+    return line
 
 _prev_prefix = None
 @in_parser_scope('_log')
@@ -445,10 +460,7 @@ def parse(inf_name):
                     if idx != None:
                         collected = l[:idx]
                         continue
-                if l.count('{')>l.count('}') or l.count('[')>l.count(']'):
-                    # balanced braces
-                    collected = l
-                    continue
+                l = bracket_escape(l)
 
                 re_string = r'[%s]([%s]*)[^%s]' \
                     % (re.escape(''.join(args.macro_prefix)), args.pattern, args.pattern)
@@ -468,7 +480,13 @@ def parse(inf_name):
                     comm = match.group(1) # the command (macro) name
                     comm_args = eval_str = ''
                     try:
-                        comm_args,l_after_macro = consume_args(l_after_macro)
+                        try:
+                            comm_args,l_after_macro = consume_args(l_after_macro)
+                        except TypeError:
+                            # An unclosed argument was seen. Retry with next line appended.
+                            collected = l
+                            l = ''
+                            break
                         len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                         comm_args = ','.join(comm_args)
 
@@ -530,6 +548,7 @@ def parse(inf_name):
 
                 # Replace any escape sequences by the original
                 l = unescape(l)
+                l = bracket_unescape(l)
 
             if l:
                 output.append(l)
