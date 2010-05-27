@@ -223,7 +223,8 @@ class args:
 
     bracket_words  = [r'\left[', r'\right]', 
                       r'\left{', r'\right}',
-                      r'\{', r'\}']
+                      r'\{', r'\}',
+                      r'\%']
     bracket_escape = '{_%d}'
 
 
@@ -256,12 +257,12 @@ def output(s):
 #### Parsing arguments. Not easily done with regexps because of possible nesting. #####
 
 # Return one argument, formatted as a python string.
-def consume_arg(l):
+def consume_arg(l, brak):
     level = 0
     pos = 0
-    for c in l[pos:]:
-        if   c in ['{','[']: level += 1
-        elif c in ['}',']']: level -= 1
+    for c in l:
+        if   c == brak[0]: level += 1
+        elif c == brak[1]: level -= 1
         pos += 1
         if level == 0:
             (arg, rest_of_line) = l[1:pos-1], l[pos:]
@@ -272,6 +273,8 @@ def consume_arg(l):
 # Return as many arguments as possible. Ignore spaces between arguments,
 # and allow exactly one optional argument [] if it comes first. The optional
 # argument is moved to the last position, to allow the standard "def a(x,y='')".
+# The awkward implementation is to avoid eating spaces unless they are followed
+# by an argument (but maybe we should never eat spaces?)
 def consume_args(l):
     args = []
     optarg = None
@@ -279,7 +282,7 @@ def consume_args(l):
     while len(l) > pos and l[pos] == ' ':
         pos += 1
     if len(l) > pos and l[pos] == '[':
-        (optarg,l) = consume_arg(l[pos:])
+        (optarg,l) = consume_arg(l[pos:], '[]')
     while True:
         pos = 0
         while len(l) > pos and l[pos] == ' ':
@@ -287,7 +290,7 @@ def consume_args(l):
         if len(l) <= pos or l[pos] != '{':
             if optarg: args.append(optarg)
             return args, l
-        (arg,l) = consume_arg(l[pos:])
+        (arg,l) = consume_arg(l[pos:], '{}')
         args.append(arg)
 
 ####### Support functions for exec'ing code blocks #############
@@ -332,13 +335,6 @@ def exec_block(lines):
         raise
 
 ######### Misc. support functions #################
-
-def comment_idx(l):
-    """Return the index of a comment / line continuation, or None if not found"""
-    if l[0] == '%':
-        return 0
-    cmatch = re.search(r'[^\\]%', l)
-    return cmatch and cmatch.start()+1
 
 @in_parser_scope('_escape')
 def escape(line):
@@ -455,11 +451,8 @@ def parse(inf_name):
             # line continuations (%) are eaten).
             if any(prefix in l for prefix in args.macro_prefix):
                 if '%' in l:
-                    # line continuations?
-                    idx = comment_idx(l)
-                    if idx != None:
-                        collected = l[:idx]
-                        continue
+                    collected = l[:l.index('%')]
+                    continue
                 l = bracket_escape(l)
 
                 re_string = r'[%s]([%s]*)[^%s]' \
