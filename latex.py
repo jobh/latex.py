@@ -949,30 +949,33 @@ def hash_file(fname):
 def build_latex():
     """Run *latex/bibtex until .aux file no longer changes (max 5 times)."""
     global args
-    def system(cmd):
+    def system(cmd, N):
         if args.verbose > 0:
-            print('>>>', cmd, file=args.errf)
+            print('[%d]'%(N+1), cmd, file=args.errf)
         return os.system(cmd)
     if args.build_type == 'dvi':
         latex = 'latex'
     else:
         latex = args.build_type + 'latex'
     if in_path(latex):
+        aux_fname = '%s.aux' % args.base_name
         try:
-            aux_hash = hash_file('%s.aux' % args.base_name)
+            aux_hash = hash_file(aux_fname)
         except:
             aux_hash = None
         for i in range(5):
-            if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name)):
-                system("grep -A15 -m1 '^!' %s.log" % args.base_name)
-                break
-            new_hash = hash_file('%s.aux' % args.base_name)
+            if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name), i):
+                print('=== Error in build:')
+                system("grep -A15 -m1 '^!' %s.log" % args.base_name, i)
+                sys.exit(1)
+            new_hash = hash_file(aux_fname)
             if new_hash == aux_hash:
+                print('=== No change in %s; build finished' % aux_fname)
                 break
             else:
                 aux_hash = new_hash
-            if i == 0 and fgrep_file(r'\bibdata{', '%s.aux' % args.base_name):
-                system('bibtex %s' % args.base_name)
+            if i == 0 and fgrep_file(r'\bibdata{', aux_fname):
+                system('bibtex %s' % args.base_name, i)
     else:
         print('*** Error: "%s" not found in PATH, skipping build.' % latex, file=args.errf)
         print('*** Use "-o %s" instead, and run latex on that one yourself.' % args.outf_name,
