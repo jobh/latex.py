@@ -212,6 +212,7 @@ class args(object):
     show_macros  = False
     show_blocks  = False
     two_pass     = False
+    print_mode   = False
     block_prefix = '%@'
     macro_prefix = ['@']
     escape       = ('{_}', '{__}', '{___}', '{____}')
@@ -715,6 +716,7 @@ def latex_print(n, format, chained_cmd):
 
 def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
+    args.print_mode = True
     get_scope()[cmd] = latex_print(n, format, get_scope().get(cmd))
 ##########################################################################
 
