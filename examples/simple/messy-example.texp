@@ -13,17 +13,17 @@ The rules:
 --- Typical definitions are like the following. These work exactly
 --- the same, frac2 is only useful for simple substitutions though.
 %-frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
-%+get_scope()[r"frac"] = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
+%+__builtin__.get_scope()[r"frac"] = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
 
 %-frac2 = r'\mathrm{%s/%s}'
-%+get_scope()[r"frac2"] = r'\mathrm{%s/%s}'
+%+__builtin__.get_scope()[r"frac2"] = r'\mathrm{%s/%s}'
 
 %@def frac3(x,y):
 %@    return r'\mathrm{%s/%s}'%(x,y)
 
 %@def frac4(x,y):  # see below for explanation
 %-    : \mathrm{#(x)/#(y)}
-%+    _output(_format(r"""\mathrm{#(x)/#(y)}""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""\mathrm{#(x)/#(y)}""") % locals())
 
 --- Macro arguments over multiple lines are ok IFF either the line breaks are
 --- within the enclosing brackets, or line continuations (%) are used. Examples:
@@ -48,21 +48,21 @@ $10^{5.4}$
 --- Some syntactic sugar for returning text:
 %@def testme(exp, base='10'):
 %-    : $#(base)^{#(exp)}$
-%+    _output(_format(r"""$#(base)^{#(exp)}$""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""$#(base)^{#(exp)}$""") % locals())
 --- (or equivalently)
 %@def testme(exp, base='10'):
-%@    return _format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
+%@    return prepare_format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
 
 --- This is also allowable to return text from blocks of code, and to define
 --- variables.
 %-name =: \emph{Your name here}
-%+get_scope()[r"name"] = _format(r"""\emph{Your name here}""") % locals()
+%+__builtin__.get_scope()[r"name"] = __builtin__.prepare_format(r"""\emph{Your name here}""") % locals()
 \emph{Your name here}
 
 %@for x in range(3):
 %@    val = str(x)
 %-    : \emph{#(val)}
-%+    _output(_format(r"""\emph{#(val)}""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""\emph{#(val)}""") % locals())
 \emph{0}
 \emph{1}
 \emph{2}
@@ -73,21 +73,21 @@ $10^{5.4}$
 --- in <text>, and outputs <text>%locals.
 %@def autotable(f,rows,caption=None):
 %@    rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
-%@    _output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
+%@    output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
 %-    :\toprule
-%+    _output(_format(r"""\toprule""") % locals())
-%@    _output(rows[0])
+%+    __builtin__.output(__builtin__.prepare_format(r"""\toprule""") % locals())
+%@    output(rows[0])
 %-    :\midrule
-%+    _output(_format(r"""\midrule""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""\midrule""") % locals())
 %@    for row in rows[1:]:
-%@        _output(row)
+%@        output(row)
 %-    :\bottomrule
-%+    _output(_format(r"""\bottomrule""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""\bottomrule""") % locals())
 %-    :\end{matrix}
-%+    _output(_format(r"""\end{matrix}""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""\end{matrix}""") % locals())
 %@    if caption:
 %-        :\caption{#(caption)}
-%+        _output(_format(r"""\caption{#(caption)}""") % locals())
+%+        __builtin__.output(__builtin__.prepare_format(r"""\caption{#(caption)}""") % locals())
 
 --- This input:
 (at)autotable{rc}{
@@ -108,9 +108,9 @@ a & f & f\\
 --- Working around python reserved words: These are allowed in *plain assignments* only.
 --- like this:
 %-def = r'Definition:'
-%+get_scope()[r"def"] = r'Definition:'
+%+__builtin__.get_scope()[r"def"] = r'Definition:'
 %-del = r'\nabla'
-%+get_scope()[r"del"] = r'\nabla'
+%+__builtin__.get_scope()[r"del"] = r'\nabla'
 
 --- The same technique can be used to create macros that contain characters that aren't
 --- legal in identifiers in python ('*').
@@ -118,18 +118,18 @@ a & f & f\\
 --- whatever. The following definitions are all equivalent.
 
 %-def* = lambda x: "Definition: "+x
-%+get_scope()[r"def*"] = lambda x: "Definition: "+x
+%+__builtin__.get_scope()[r"def*"] = lambda x: "Definition: "+x
 Definition: this
 
 %@def _def(x):
 %-    : Definition: #(x)
-%+    _output(_format(r"""Definition: #(x)""") % locals())
+%+    __builtin__.output(__builtin__.prepare_format(r"""Definition: #(x)""") % locals())
 %-def* = _def
-%+get_scope()[r"def*"] = _def
+%+__builtin__.get_scope()[r"def*"] = _def
 Definition: this
 
 %-def* = r'Definition: %s'
-%+get_scope()[r"def*"] = r'Definition: %s'
+%+__builtin__.get_scope()[r"def*"] = r'Definition: %s'
 Definition: this
 
 --- Other uses of reserved words must use the scope dict explicitly:

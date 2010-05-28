@@ -108,6 +108,7 @@ import re
 import itertools
 import collections
 import contextlib
+import __builtin__
 
 ########## Scopes ###############################
 
@@ -115,22 +116,19 @@ import contextlib
 # underscores are shared between all scopes. See 
 # examples/simple/multi_prefix.tex for example of use.
 
-main_parser_scope = {}
+main_parser_scope = {'__builtin__': __builtin__}
 parser_scopes = {} # populated in get_scope()
 
-def in_parser_scope(s=None):
+def builtin(f):
     """Decorator which adds the function (or class) to the
     parser scopes."""
-    def wrap(f):
-        global main_parser_scope
-        parser_scope_name = s or f.__code__.co_name
-        if not '_' in parser_scope_name:
-            raise RuntimeError('Builtins in parser scope must contain "_"')
-        main_parser_scope[parser_scope_name] = f
-        return f
-    return wrap
+    global main_parser_scope
+    if hasattr(__builtin__, f.__name__):
+        raise RuntimeError('Shadowing builtin name %s', f.__name__)
+    setattr(__builtin__, f.__name__, f)
+    return f
 
-@in_parser_scope()
+@builtin
 def get_scope(x=None):
     global main_parser_scope, parser_scopes
     if not x:
@@ -150,7 +148,7 @@ def get_scope(x=None):
         copy_hidden(main_parser_scope, new_scope)
     return new_scope
 
-@in_parser_scope('_scope')
+@builtin
 @contextlib.contextmanager
 def scope(x):
     orig_scope = get_scope()
@@ -183,7 +181,7 @@ def eval_scope(x):
     finally:
         main_parser_scope = orig_scope
 
-@in_parser_scope()
+@builtin
 def current_match(idx=1):
     return _current_match[idx]
 
@@ -202,8 +200,8 @@ def copy_hidden(fro, to):
 
 ########## Arguments #####################
 
-@in_parser_scope('_args')
-class args:
+@builtin
+class args(object):
     __init__     = None         # disallow instantiation
     build_type   = None
     outf         = sys.stdout
@@ -243,14 +241,14 @@ def pop_pending_output():
     return ret
 
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
-@in_parser_scope('_format')
-def format(s):
+@builtin
+def prepare_format(s):
     replace_re, replace_with = format_replacer
     s = s.replace('%', '%%')
     s = replace_re.sub(replace_with, s)
     return s
 
-@in_parser_scope('_output')
+@builtin
 def output(s):
     pending_output.append(s)
 
@@ -300,20 +298,20 @@ def consume_args(l):
 replacers = [
     # Convert and format RHS literal strings
     #    return : \vec{#(x)}
-    #--> return _format(r"""\vec{#(x)}""" % locals()
+    #--> return prepare_format(r"""\vec{#(x)}""" % locals()
     #    del = : \nabla
-    #--> del = _format(r"""\nabla""") % locals()
+    #--> del = prepare_format(r"""\nabla""") % locals()
     (re.compile(r'^(\s*([%s]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
-     r'\1 _format(r"""\3""") % locals()'),
+     r'\1 __builtin__.prepare_format(r"""\3""") % locals()'),
     # Convert reserved words. Only at beginning of line (outer scope).
-    #    del = _format(r"""\nabla"") % locals()
+    #    del = prepare_format(r"""\nabla"") % locals()
     #--> get_scope()[r"del"] = ...
     (re.compile(r'^([%s]*)\s*='%args.pattern),
-     r'get_scope()[r"\1"] ='),
+     r'__builtin__.get_scope()[r"\1"] ='),
     #    : \vec{#(x)}
-    #--> _output(r"""\vec{%(x)s}""" % locals())
+    #--> output(r"""\vec{%(x)s}""" % locals())
     (re.compile(r'^(\s*):\s*(.*)$'),
-     r'\1_output(_format(r"""\2""") % locals())'), 
+     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2""") % locals())'), 
     ]
 
 def fixup_line(l):
@@ -336,7 +334,7 @@ def exec_block(lines):
 
 ######### Misc. support functions #################
 
-@in_parser_scope('_escape')
+@builtin
 def escape(line):
     global args
     for a,b in zip(args.macro_prefix, args.escape):
@@ -371,7 +369,7 @@ def bracket_unescape(line):
     return line
 
 _prev_prefix = None
-@in_parser_scope('_log')
+@builtin
 def log(*text):
     global prefix1, prefix2, _prev_prefix
     if prefix1 != _prev_prefix:
@@ -657,14 +655,14 @@ def latex_input(name):
 _latex = {'environment': []}
 get_scope()['_latex'] = _latex
 
-@in_parser_scope()
+@builtin
 def latex_usepackage(names, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
     for name in names.split(','):
         _latex[name] = opt
     ignore()
-@in_parser_scope()
+@builtin
 def latex_documentclass(name, opt=None):
     if opt: opt = opt.split(',')
     else:   opt = []
@@ -672,11 +670,11 @@ def latex_documentclass(name, opt=None):
     _latex['documentclass_opts'] = opt
     ignore()
 
-@in_parser_scope()
+@builtin
 def latex_begin(name, *args):
     _latex['environment'].append(name)
     ignore()
-@in_parser_scope()
+@builtin
 def latex_end(name):
     expected_name = _latex['environment'].pop()
     if expected_name != name:
@@ -717,7 +715,7 @@ def set_print_mode(cmd, n=None, format='%s'):
 ##########################################################################
 
 ############### Utility functions ###############
-@in_parser_scope('_ignore')
+@builtin
 def ignore(*args):
     if len(args) == 1 and hasattr(args[0], '__call__'):
         func = args[0]
@@ -728,7 +726,7 @@ def ignore(*args):
     else:
         raise StopIteration
 
-@in_parser_scope()
+@builtin
 def is_sentence_start():
     b = current_match(0)
     # Check if text preceding match ends with a character that is not '.' or ':'
@@ -737,7 +735,7 @@ def is_sentence_start():
     else:
         return True
 
-@in_parser_scope()
+@builtin
 def upcase_at_start(func_or_str):
     """Decorator (or function, if called with string) to upcase first character
     if it is at the beginning of a sentence."""
@@ -751,18 +749,11 @@ def upcase_at_start(func_or_str):
         return ret
     return wrapper
 
-@in_parser_scope('_eval')
-def do_eval(x):
-    try:
-        return str(eval(x))
-    except:
-        ignore()
-
 def match_has_optional_parameter():
     m = current_match()
     return re.match(r'.[%s]*[[]'%args.pattern, m)
     
-@in_parser_scope()
+@builtin
 def opt_kwargs(func):
     """Decorator to allow calling a function like \func[key=val,other=foo]{text}."""
     def wrapper(*args):
@@ -778,7 +769,7 @@ def opt_kwargs(func):
         return func(*args, **kwargs)
     return wrapper
 
-@in_parser_scope()
+@builtin
 def shell_eval(cmd):
     import subprocess
     if isinstance(cmd, str):
@@ -790,7 +781,7 @@ def shell_eval(cmd):
         raise
     return cmd.communicate()[0].decode()
 
-@in_parser_scope()
+@builtin
 def expect_version(expected):
     if args.version < expected:
         raise RuntimeError('latex.py v%.2f is too old; %.2f required' % (args.version, expected))
@@ -798,7 +789,7 @@ def expect_version(expected):
         log('latex.py v%.2f may be too new; expected version %.2f' % (args.version, expected))
 
 
-@in_parser_scope()
+@builtin
 def ensure_math(func):
     is_math = ['equation', 'eqnarray', 'align', 'equation*', 'eqnarray*']
     if isinstance(func, str):

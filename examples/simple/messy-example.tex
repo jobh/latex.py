@@ -54,7 +54,7 @@ or
 %@    : $#(base)^{#(exp)}$
 --- (or equivalently)
 %@def testme(exp, base='10'):
-%@    return _format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
+%@    return prepare_format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
 
 --- This is also allowable to return text from blocks of code, and to define
 --- variables.
@@ -72,12 +72,12 @@ or
 {%@
 def autotable(f,rows,caption=None):
     rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
-    _output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
+    output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
     :\toprule
-    _output(rows[0])
+    output(rows[0])
     :\midrule
     for row in rows[1:]:
-        _output(row)
+        output(row)
     :\bottomrule
     :\end{matrix}
     if caption:

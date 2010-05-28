@@ -3,8 +3,8 @@
 % Use another prefix for certain macros.
 
 {%@
-nabla = _escape(r'\vec{\nabla}}')
-with _scope('@'):
+nabla = escape(r'\vec{\nabla}}')
+with scope('@'):
     u = ensure_math(r'\vec{u}')
     Pf = ensure_math(r'P_\text{f}')
     S = ensure_math('S')
@@ -29,10 +29,10 @@ But then we have to define them all, even the plain ones (@S and @q). Maybe this
 {%@
 def __missing__(key, *args):
    if not key or args or current_match()[0] != '@':
-       _ignore()
+       ignore()
    usage_count[key] += 1
    return ensure_math(key)()
-with _scope('@'):
+with scope('@'):
     del S  # Don't need it anymore, it's covered by __missing__
 }%@
 
@@ -50,7 +50,7 @@ We can work around this by protecting the part after @ with brackets, like above
 This can even be invisible in the output, like so:
 
 % Make a macro '' (empty string) that just returns its escaped (single) argument
-%@get_scope('@')[''] = lambda *args: len(args)==1 and _escape('@')+args[0] or _ignore()
+%@get_scope('@')[''] = lambda *args: len(args)==1 and escape('@')+args[0] or ignore()
 
 Try again:
 We can work around this by protecting the part after @ with brackets, like above.
@@ -62,14 +62,14 @@ and '£', but these would be a problem for collaborators with different keyboard
 layouts. Maybe '#' is an option, if we are careful to avoid code listings?
 
 {%@
-with _scope('#'):
+with scope('#'):
     @ensure_math
     def __missing__(key, *args):
         if (not key) or args or (current_match()[0] != '#'):
-            _ignore()
+            ignore()
         for env in _latex['environment']:
            if env in ['lstlisting', 'verbatim']:
-               _ignore()
+               ignore()
         usage_count[key] += 1
         return key
     R = ensure_math(r'\mathcal{R}')

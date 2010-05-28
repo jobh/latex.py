@@ -8,7 +8,7 @@ for file in $(git ls-files | grep '\.texp$'); do
         rm -f $target
         echo -n "$PYTHON $dir\$ "
         make PYTHON=$python $target
-        PAGER= git diff --exit-code $target | head || { echo "! $file failed with $PYTHON"; exit 1; }
+        PAGER= git diff --exit-code $target || { echo "! $file failed with $PYTHON"; exit 1; }
     done
     popd >/dev/null
 done

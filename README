@@ -70,13 +70,16 @@ can be used on an unmodified latex file to expand all user-defined macros.
 Another short example:
 
 ---
-%@py = _eval                             [5]
-\title{Proving that $2+2=@py{2+2}$
+%@eval = eval                              [5]
+\title{Proving that $2+2=@eval{2+2}$
 ---
 
-The line [5] is required to make the builtin macro _eval visible, since
-'_' is not allowed in macro names. All builtins contain '_' and must
-explicitly be given a name.
+The line [5] is required to make the builtin function eval visible as a macro. 
+Note that these builtins may be shadowed by user variables, but are always 
+accessible as for example __builtin__.eval.
+It is recommended that functions, variables and classes that should not be
+visible as macros should contain the underscore character ('_'), since it is
+not allowed in a macro name.
 
 
 See the examples/ directory for other examples.
