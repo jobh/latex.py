@@ -544,6 +544,10 @@ def parse(inf_name):
             if l:
                 output.append(l)
 
+    if collected:
+        raise RuntimeError('Argument not closed, starting at %s:%d\n>>> '
+                           % (inf_name,lno-collected.count('\n')-3)
+                           +collected.split('\n')[0])
     return output
 
 ########## Definitions used by the process-latex-commands (-L) mode ###########
