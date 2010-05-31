@@ -108,7 +108,10 @@ import re
 import itertools
 import collections
 import contextlib
-import __builtin__
+try:
+    import __builtin__
+except ImportError:
+    import builtins as __builtin__ # python3
 
 ########## Scopes ###############################
 
@@ -183,7 +186,10 @@ def eval_scope(x):
 
 @builtin
 def current_match(idx=1):
-    return _current_match[idx]
+    if (idx == 0):
+        out, cur = _current_match[0]
+        return bracket_unescape(''.join(out[-1:]) + unescape(cur))
+    return bracket_unescape(_current_match[idx])
 
 def remove_macros_from(s):
     for k in list(s.keys()):
@@ -224,7 +230,7 @@ class args(object):
                       r'\left{', r'\right}',
                       r'\{', r'\}',
                       r'\%']
-    bracket_escape = '{_%d}'
+    bracket_escape = '_{_%d}'
 
 
 usage_count = collections.defaultdict(int)
@@ -467,8 +473,8 @@ def parse(inf_name):
                         break
 
                     l_before_macro = l[:match.start()]
+                    len_of_match = match.end()-1-match.start()
                     l_after_macro = l[match.end()-1:]
-                    len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
                     comm = match.group(1) # the command (macro) name
                     comm_args = eval_str = ''
                     try:
@@ -479,14 +485,13 @@ def parse(inf_name):
                             collected = l
                             l = ''
                             break
-                        len_of_match = len(l) - len(l_after_macro) - len(l_before_macro)
+                        l_in_macro = l[match.start():len(l)-len(l_after_macro)]
+                        len_of_match = len(l_in_macro)
                         comm_args = ','.join(comm_args)
-
-                        l_in_macro = l[match.start():match.start()+len_of_match]
                         m_prefix = l_in_macro[0]
                         with eval_scope(m_prefix):
                             global _current_match
-                            _current_match = [''.join(output[-1:])+unescape(l_before_macro),
+                            _current_match = [(output, l_before_macro),
                                               l_in_macro,
                                               l_after_macro]
                             comm_obj = get_scope().get(comm)
@@ -516,7 +521,7 @@ def parse(inf_name):
                                 result = pop_pending_output() + result
                             if args.verbose >= 3:
                                 log(l.rstrip().replace('\n', r'~'))
-                                log(' '*match.start() + '^'*len_of_match)
+                                log(' '*match.start() + '^'*len(l_in_macro))
                                 log('>>>', eval_str, '==> """%s"""'%result)
                     except Exception as e:
                         if isinstance(e, KeyError) and e.args[0]==comm: severity = 2
@@ -536,7 +541,7 @@ def parse(inf_name):
                         # to expand this (failed) macro again.
                         result = escape(l_in_macro[0]) + l_in_macro[1:]
 
-                    l = '%s%s%s' % (l_before_macro,str(result),l_after_macro)
+                    l = '%s%s%s' % (l_before_macro, bracket_escape(str(result)), l_after_macro)
 
                 # Replace any escape sequences by the original
                 l = unescape(l)
