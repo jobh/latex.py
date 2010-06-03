@@ -326,12 +326,18 @@ def fixup_line(l):
         l = replace_re.sub(replace_with, l)
     return l
 
+warned = set(['input'])
 def exec_block(lines):
     if args.verbose >= 3:
         debuglines = '>>> '+lines.replace('\n', '\n>>> ')+'\n'
         args.errf.write(debuglines);
     try:
         exec(lines, get_scope())
+        if args.verbose >= 1:
+            for k in get_scope().keys():
+                if hasattr(__builtin__, k) and not k in warned:
+                    log('Warning: %s shadows builtin'%k)
+                warned.add(k)
     except Exception as e:
         log(repr(e))
         print('------ code block: -------', file=args.errf)
@@ -541,6 +547,9 @@ def parse(inf_name):
                         # to expand this (failed) macro again.
                         result = escape(l_in_macro[0]) + l_in_macro[1:]
 
+                    if args.verbose >= 1 and l_in_macro in result and not l_in_macro in warned:
+                        log('Possible recursion in %s->%s'% (l_in_macro,result))
+                        warned.add(l_in_macro)
                     l = '%s%s%s' % (l_before_macro, bracket_escape(str(result)), l_after_macro)
 
                 # Replace any escape sequences by the original
