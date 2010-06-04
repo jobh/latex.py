@@ -218,7 +218,6 @@ class args(object):
     show_macros  = False
     show_blocks  = False
     two_pass     = False
-    print_mode   = False
     block_prefix = '%@'
     macro_prefix = ['@']
     escape       = ('{_}', '{__}', '{___}', '{____}')
@@ -715,23 +714,23 @@ def set_latex_parse_mode():
 
 ############### Definitions used by the dependency-printing mode ###############
 def latex_print(n, format, chained_cmd):
-    def one_printer(*args):
-        print(format%args[n])
+    def printer(*args, **kwargs):
+        if n is None:
+            print('|'.join(args))
+        else:
+            print(format%args[n])
         if chained_cmd:
-            return chained_cmd(*args)
-    def all_printer(*args):
-        print('|'.join(args))
-        if chained_cmd:
-            return chained_cmd(*args)
-    if n == None:
-        return all_printer
-    else:
-        return one_printer
+            return chained_cmd(*args, **kwargs)
+    return printer
 
 def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
-    args.print_mode = True
-    get_scope()[cmd] = latex_print(n, format, get_scope().get(cmd))
+    scope = get_scope()
+    if not cmd in scope and hasattr(__builtin__, cmd):
+        setattr(__builtin__, cmd, latex_print(n, format, getattr(__builtin__, cmd)))
+    else:
+        scope[cmd] = latex_print(n, format, scope.get(cmd))
+
 ##########################################################################
 
 ############### Utility functions ###############
