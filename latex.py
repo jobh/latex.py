@@ -118,8 +118,9 @@ except ImportError:
 # Note that the scopes are a bit weird. In effect, attributes containing
 # underscores are shared between all scopes. See 
 # examples/simple/multi_prefix.tex for example of use.
-
-main_parser_scope = {'__builtin__': __builtin__}
+class __macros__:
+    pass
+main_parser_scope = {'__builtin__': __builtin__, '__macros__': __macros__}
 parser_scopes = {} # populated in get_scope()
 
 def builtin(f):
@@ -500,6 +501,8 @@ def parse(inf_name):
                                               l_in_macro,
                                               l_after_macro]
                             comm_obj = get_scope().get(comm)
+                            if comm_obj is None:
+                                comm_obj = getattr(__macros__, comm, None)
                             if comm_obj is None:
                                 comm_obj = get_scope().get('__missing__')
                                 if comm_obj is not None:
