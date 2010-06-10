@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 for file in $(git ls-files | grep '\.texp$'); do
     dir=${file%/*}

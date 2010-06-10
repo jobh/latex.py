@@ -20,7 +20,7 @@ The rules:
 --- the same, frac2 is only useful for simple substitutions though.
 %@frac = lambda x,y: r'\mathrm{%s/%s}'%(x,y)
 
-%@frac2 = r'\mathrm{%s/%s}'
+%@frac2 = r'\mathrm{#(0)/#(1)}'
 
 %@def frac3(x,y):
 %@    return r'\mathrm{%s/%s}'%(x,y)
@@ -115,7 +115,7 @@ a & f & f
 %@def* = _def
 @def*{this}
 
-%@def* = r'Definition: %s'
+%@def* = r'Definition: #(0)'
 @def*{this}
 
 --- Other uses of reserved words must use the scope dict explicitly:

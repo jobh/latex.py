@@ -167,7 +167,7 @@ def get_macro(x=None, scope=None):
 @builtin
 def call(x, *args, **kwargs):
     if isinstance(x, str):
-        return x % args % kwargs
+        return prepare_format(x).format(*args, **kwargs)
     else:
         return x(*args, **kwargs)
 
@@ -267,11 +267,11 @@ def pop_pending_output():
     pending_output = []
     return ret
 
-format_replacer = (re.compile(r'#\(([^)]+)\)'), r'%(\1)s')
+format_replacer = (re.compile(r'#\(([^)]+)\)'), r'{\1}')
 @builtin
 def prepare_format(s):
     replace_re, replace_with = format_replacer
-    s = s.replace('%', '%%')
+    s = s.replace('{', '{{').replace('}', '}}')
     s = replace_re.sub(replace_with, s)
     return s
 
@@ -329,7 +329,7 @@ replacers = [
     #    del = : \nabla
     #--> del = prepare_format(r"""\nabla""") % locals()
     (re.compile(r'^(\s*([%s_.]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
-     r'\1 __builtin__.prepare_format(r"""\3""") % locals()'),
+     r'\1 __builtin__.prepare_format(r"""\3""").format(**locals())'),
     # Convert reserved words. Only at beginning of line (outer scope).
     #    del = prepare_format(r"""\nabla"") % locals()
     #--> get_scope()[r"del"] = ...
@@ -338,7 +338,7 @@ replacers = [
     #    : \vec{#(x)}
     #--> output(r"""\vec{%(x)s}""" % locals())
     (re.compile(r'^(\s*):\s*(.*)$'),
-     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2""") % locals())'), 
+     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2""").format(**locals()))'), 
     ]
 
 def fixup_line(l):
@@ -608,24 +608,20 @@ class latex_new_comm(object):
             # Case (1.1)
             self.finished = True
             self.set_definition(definition)
-            self.set_nargs(0)
+            self.nargs = 0
         else:
             # Case (2.1) or (3.1)
             self.finished = False
         self.name = name
         self.has_opt_arg = False
 
-    def set_definition(self, definition):
-        definition = definition.replace('%', '%%')
-        self.definition = re.sub(r'#([0-9])', r'%(\1)s', definition)
-
-    def set_nargs(self, nargs):
-        self.arg_keys = [str(i+1) for i in range(nargs)]
-        self.nargs = nargs
+    def set_definition(self, s):
+        s = s.replace('{', '{{').replace('}', '}}')
+        self.definition = re.sub(r'#([0-9])', r'{\1}', s)
 
     def format(self, *args):
+        args = list(args)
         if self.has_opt_arg:
-            args = list(args)
             if len(args) == self.nargs-1:
                 args = [self.opt_arg] + args
             else:
@@ -636,7 +632,8 @@ class latex_new_comm(object):
             for arg in args[self.nargs:]:
                 if arg != '':
                     raise RuntimeError('%s called with extra arg "%s"' % (self.name, arg))
-        return self.definition % dict(zip(self.arg_keys, args))
+        args = [None]+args
+        return self.definition.format(*args)
 
     def __call__(self, *args):
         if self.finished:
@@ -644,7 +641,7 @@ class latex_new_comm(object):
 
         if len(args) == 1:
             # Case (3.2)
-            self.set_nargs(int(args[0]))
+            self.nargs = int(args[0])
             self.has_opt_arg = True
             return self.name    # definition still not finished, call me again
 
@@ -654,7 +651,7 @@ class latex_new_comm(object):
             self.opt_arg = nargs_or_opt_arg
         else:
             # Case (2.2)
-            self.set_nargs(int(nargs_or_opt_arg))
+            self.nargs = int(nargs_or_opt_arg)
         self.set_definition(definition)
         self.finished = True
 
