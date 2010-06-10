@@ -268,9 +268,10 @@ def pop_pending_output():
     return ret
 
 format_replacer = (re.compile(r'#\(([^)]+)\)'), r'{\1}')
+format_replacer2 = (re.compile(r'#\(([^0-9)]+)\)'), r'{\1}')
 @builtin
-def prepare_format(s):
-    replace_re, replace_with = format_replacer
+def prepare_format(s, kwargs_only=False):
+    replace_re, replace_with = format_replacer2 if kwargs_only else format_replacer
     s = s.replace('{', '{{').replace('}', '}}')
     s = replace_re.sub(replace_with, s)
     return s
@@ -325,20 +326,20 @@ def consume_args(l):
 replacers = [
     # Convert and format RHS literal strings
     #    return : \vec{#(x)}
-    #--> return prepare_format(r"""\vec{#(x)}""" % locals()
+    #--> return prepare_format(r"""\vec{#(x)}""", True).format(**locals())
     #    del = : \nabla
-    #--> del = prepare_format(r"""\nabla""") % locals()
+    #--> del = prepare_format(r"""\nabla""", True).format(**locals())
     (re.compile(r'^(\s*([%s_.]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
-     r'\1 __builtin__.prepare_format(r"""\3""").format(**locals())'),
+     r'\1 __builtin__.prepare_format(r"""\3""", kwargs_only=True).format(**__builtin__.locals())'),
     # Convert reserved words. Only at beginning of line (outer scope).
-    #    del = prepare_format(r"""\nabla"") % locals()
+    #    del = prepare_format(r"""\nabla"", True).format(**locals())
     #--> get_scope()[r"del"] = ...
     (re.compile(r'^([%s]*)\s*='%args.pattern),
      r'__builtin__.get_scope()[r"\1"] ='),
     #    : \vec{#(x)}
-    #--> output(r"""\vec{%(x)s}""" % locals())
+    #--> output(prepare_format(r"""\vec{%(x)s}""").format(**locals()))
     (re.compile(r'^(\s*):\s*(.*)$'),
-     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2""").format(**locals()))'), 
+     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2""").format(**__builtin__.locals()))'), 
     ]
 
 def fixup_line(l):

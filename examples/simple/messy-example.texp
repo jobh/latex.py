@@ -23,7 +23,7 @@ The rules:
 
 %@def frac4(x,y):  # see below for explanation
 %-    : \mathrm{#(x)/#(y)}
-%+    __builtin__.output(__builtin__.prepare_format(r"""\mathrm{#(x)/#(y)}""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""\mathrm{#(x)/#(y)}""").format(**__builtin__.locals()))
 
 --- Macro arguments over multiple lines are ok IFF either the line breaks are
 --- within the enclosing brackets, or line continuations (%) are used. Examples:
@@ -48,7 +48,7 @@ $10^{5.4}$
 --- Some syntactic sugar for returning text:
 %@def testme(exp, base='10'):
 %-    : $#(base)^{#(exp)}$
-%+    __builtin__.output(__builtin__.prepare_format(r"""$#(base)^{#(exp)}$""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""$#(base)^{#(exp)}$""").format(**__builtin__.locals()))
 --- (or equivalently)
 %@def testme(exp, base='10'):
 %@    return prepare_format(r'$#(base)^{#(exp)}$') % {'exp':exp, 'base':base}
@@ -56,13 +56,13 @@ $10^{5.4}$
 --- This is also allowable to return text from blocks of code, and to define
 --- variables.
 %-name =: \emph{Your name here}
-%+__builtin__.get_scope()[r"name"] = __builtin__.prepare_format(r"""\emph{Your name here}""").format(**locals())
+%+__builtin__.get_scope()[r"name"] = __builtin__.prepare_format(r"""\emph{Your name here}""", kwargs_only=True).format(**__builtin__.locals())
 \emph{Your name here}
 
 %@for x in range(3):
 %@    val = str(x)
 %-    : \emph{#(val)}
-%+    __builtin__.output(__builtin__.prepare_format(r"""\emph{#(val)}""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""\emph{#(val)}""").format(**__builtin__.locals()))
 \emph{0}
 \emph{1}
 \emph{2}
@@ -75,19 +75,19 @@ $10^{5.4}$
 %@    rows = [l.strip()+r'\\' for l in rows.split(r'\\')]
 %@    output(r'\begin{matrix}{%s%s}' % (f[0], f[1]*rows[0].count('&')))
 %-    :\toprule
-%+    __builtin__.output(__builtin__.prepare_format(r"""\toprule""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""\toprule""").format(**__builtin__.locals()))
 %@    output(rows[0])
 %-    :\midrule
-%+    __builtin__.output(__builtin__.prepare_format(r"""\midrule""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""\midrule""").format(**__builtin__.locals()))
 %@    for row in rows[1:]:
 %@        output(row)
 %-    :\bottomrule
-%+    __builtin__.output(__builtin__.prepare_format(r"""\bottomrule""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""\bottomrule""").format(**__builtin__.locals()))
 %-    :\end{matrix}
-%+    __builtin__.output(__builtin__.prepare_format(r"""\end{matrix}""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""\end{matrix}""").format(**__builtin__.locals()))
 %@    if caption:
 %-        :\caption{#(caption)}
-%+        __builtin__.output(__builtin__.prepare_format(r"""\caption{#(caption)}""").format(**locals()))
+%+        __builtin__.output(__builtin__.prepare_format(r"""\caption{#(caption)}""").format(**__builtin__.locals()))
 
 --- This input:
 (at)autotable{rc}{
@@ -123,7 +123,7 @@ Definition: this
 
 %@def _def(x):
 %-    : Definition: #(x)
-%+    __builtin__.output(__builtin__.prepare_format(r"""Definition: #(x)""").format(**locals()))
+%+    __builtin__.output(__builtin__.prepare_format(r"""Definition: #(x)""").format(**__builtin__.locals()))
 %-def* = _def
 %+__builtin__.get_scope()[r"def*"] = _def
 Definition: this
