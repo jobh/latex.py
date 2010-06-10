@@ -15,8 +15,6 @@ S\dot{P_\text{f}} \alpha \vec{\nabla}} \cdot \dot{\vec{u}} = @q
 
 But then we have to define them all, even the plain ones (\ensuremath{S} and @q). Maybe this will work:
 
-% across all scopes (since it contains underscores) and thus must check explicitly which
-% scope it is called in.
 
 
 Now the equation is

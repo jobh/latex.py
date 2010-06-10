@@ -22,17 +22,14 @@ the standard prefix as well, but see below...
 
 But then we have to define them all, even the plain ones (@S and @q). Maybe this will work:
 
-% Make any @X for undefined X return just 'X'. Note that __missing__ is a common function
-% across all scopes (since it contains underscores) and thus must check explicitly which
-% scope it is called in.
+% Make any @X for undefined X return just 'X'.
 
 {%@
-def __missing__(key, *args):
-   if not key or args or current_match()[0] != '@':
-       ignore()
-   usage_count[key] += 1
-   return ensure_math(key)()
 with scope('@'):
+    def __missing__(key, *args):
+       if not key or args:
+           ignore()
+       return ensure_math(key)()
     del S  # Don't need it anymore, it's covered by __missing__
 }%@
 

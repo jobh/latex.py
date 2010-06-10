@@ -118,9 +118,9 @@ except ImportError:
 # Note that the scopes are a bit weird. In effect, attributes containing
 # underscores are shared between all scopes. See 
 # examples/simple/multi_prefix.tex for example of use.
-class __macros__:
+class __macros:
     pass
-main_parser_scope = {'__builtin__': __builtin__, '__macros__': __macros__}
+main_parser_scope = {'__builtin__': __builtin__, '__macros__': __macros()}
 parser_scopes = {} # populated in get_scope()
 
 def builtin(f):
@@ -142,6 +142,7 @@ def get_scope(x=None):
     if not x in parser_scopes:
         new_scope = main_parser_scope.copy()
         remove_macros_from(new_scope)
+        new_scope['__macros__'] = __macros()
         parser_scopes[x] = new_scope
         if not x in args.macro_prefix:
             args.macro_prefix.append(x)
@@ -151,6 +152,25 @@ def get_scope(x=None):
         # ensure the hidden attributes are the same everywhere
         copy_hidden(main_parser_scope, new_scope)
     return new_scope
+
+@builtin
+def get_macro(x=None, scope=None):
+    scope = get_scope(scope)
+    macros = scope['__macros__']
+    if x is None:
+        return macros
+    macro = getattr(macros, x, None)
+    if macro is None:
+        macro = scope.get(x)
+    return macro
+
+@builtin
+def call(x, *args, **kwargs):
+    if isinstance(x, str):
+        return x % args % kwargs
+    else:
+        return x(*args, **kwargs)
+
 
 @builtin
 @contextlib.contextmanager
@@ -194,15 +214,15 @@ def current_match(idx=1):
 
 def remove_macros_from(s):
     for k in list(s.keys()):
-        if not '_' in k:
+        if not '_' in k or k in ['__macros__', '__missing__']:
             del s[k]
 def copy_macros(fro, to):
     for k in fro.keys():
-        if not '_' in k:
+        if not '_' in k or k in ['__macros__', '__missing__']:
             to[k] = fro[k]
 def copy_hidden(fro, to):
     for k in fro.keys():
-        if '_' in k:
+        if '_' in k and k not in ['__macros__', '__missing__']:
             to[k] = fro[k]
 
 ########## Arguments #####################
@@ -308,7 +328,7 @@ replacers = [
     #--> return prepare_format(r"""\vec{#(x)}""" % locals()
     #    del = : \nabla
     #--> del = prepare_format(r"""\nabla""") % locals()
-    (re.compile(r'^(\s*([%s]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
+    (re.compile(r'^(\s*([%s_.]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
      r'\1 __builtin__.prepare_format(r"""\3""") % locals()'),
     # Convert reserved words. Only at beginning of line (outer scope).
     #    del = prepare_format(r"""\nabla"") % locals()
@@ -500,11 +520,10 @@ def parse(inf_name):
                             _current_match = [(output, l_before_macro),
                                               l_in_macro,
                                               l_after_macro]
-                            comm_obj = get_scope().get(comm)
+                            scope = get_scope()
+                            comm_obj = get_macro(comm)
                             if comm_obj is None:
-                                comm_obj = getattr(__macros__, comm, None)
-                            if comm_obj is None:
-                                comm_obj = get_scope().get('__missing__')
+                                comm_obj = scope.get('__missing__')
                                 if comm_obj is not None:
                                     comm_args = 'r"""%s""",'%comm + comm_args
                                     comm = '__missing__'
@@ -512,16 +531,10 @@ def parse(inf_name):
                                 raise KeyError(comm)
                             usage_count[comm] += 1
 
-                            if isinstance(comm_obj, str):
-                                # The definition is a format string
-                                eval_str = 'r"""%s"""%%((%s))'%(comm_obj,comm_args)
-                            else:
-                                # The definition is a function. Protect reserved words
-                                # by calling get_scope()['func'] instead of func.
-                                eval_str = 'get_scope()[r"%s"](%s)'%(comm, comm_args)
+                            eval_str = '__builtin__.call(__builtin__.get_macro(r"%s"),%s)'%(comm, comm_args)
 
                             try:
-                                result = eval(eval_str, get_scope()) or args.dummy
+                                result = str(eval(eval_str, get_scope()) or args.dummy)
                             except StopIteration:
                                 result = escape(l_in_macro[0]) + l_in_macro[1:]
 
@@ -647,15 +660,15 @@ class latex_new_comm(object):
 
 def latex_newcommand(name, definition=None, redefine=False):
     # Check if the command is one that is explicitly ignored by user
-    if get_scope().get(name[1:]) == ignore:
+    if get_macro(name[1:]) == ignore:
         if args.verbose >= 3:
             log(r'Ignoring \newcommand{%s}'%name)
         ignore()
     command = latex_new_comm(name, definition)
-    old_cmd = get_scope().get(name[1:])
+    old_cmd = get_macro(name[1:])
     if not redefine and old_cmd and args.verbose >= 2 and args.two_pass != 2:
         log('Redefining %s'%name)
-    get_scope()[name[1:]] = command
+    setattr(get_macro(), name[1:], command)
     if not command.finished:
         return name             # finish definition in new_comm.__call__
 
@@ -706,13 +719,14 @@ def latex_end(name):
 def set_latex_parse_mode():
     args.verbose = 1
     args.macro_prefix[0] = '\\'
-    get_scope()['newcommand']    = latex_newcommand
-    get_scope()['renewcommand']  = latex_renewcommand
-    get_scope()['input']         = latex_input
-    get_scope()['usepackage']    = latex_usepackage
-    get_scope()['documentclass'] = latex_documentclass
-    get_scope()['begin']         = latex_begin
-    get_scope()['end']           = latex_end
+    macros = get_macro()
+    macros.newcommand    = latex_newcommand
+    macros.renewcommand  = latex_renewcommand
+    macros.input         = latex_input
+    macros.usepackage    = latex_usepackage
+    macros.documentclass = latex_documentclass
+    macros.begin         = latex_begin
+    macros.end           = latex_end
 ############################################################################
 
 ############### Definitions used by the dependency-printing mode ###############
@@ -729,10 +743,16 @@ def latex_print(n, format, chained_cmd):
 def set_print_mode(cmd, n=None, format='%s'):
     args.output = False
     scope = get_scope()
-    if not cmd in scope and hasattr(__builtin__, cmd):
-        setattr(__builtin__, cmd, latex_print(n, format, getattr(__builtin__, cmd)))
+    if hasattr(get_macro(), cmd):
+        where = get_macro().__dict__
+    elif cmd in scope:
+        where = scope
+    elif hasattr(scope['__builtin__'], cmd):
+        where = scope['__builtin__'].__dict__
     else:
-        scope[cmd] = latex_print(n, format, scope.get(cmd))
+        where = scope
+    old_cmd = where.get(cmd)
+    where[cmd] = latex_print(n, format, old_cmd)
 
 ##########################################################################
 
@@ -762,10 +782,7 @@ def upcase_at_start(func_or_str):
     """Decorator (or function, if called with string) to upcase first character
     if it is at the beginning of a sentence."""
     def wrapper(*args, **kwargs):
-        if isinstance(func_or_str, str):
-            ret = func_or_str % args
-        else:
-            ret = func_or_str(*args, **kwargs)
+        ret = call(func_or_str, *args, **kwargs)
         if is_sentence_start() and ret and isinstance(ret, str):
             ret = ret[0].upper()+ret[1:]
         return ret
@@ -814,11 +831,8 @@ def expect_version(expected):
 @builtin
 def ensure_math(func):
     is_math = ['equation', 'eqnarray', 'align', 'equation*', 'eqnarray*']
-    if isinstance(func, str):
-        s = func
-        func = lambda *args: s % args
     def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
+        result = call(func, *args, **kwargs)
         for env in reversed(_latex['environment']):
             if env in is_math:
                 return result
@@ -918,6 +932,7 @@ def show_macros():
     print('User (hidden):', ', '.join(sorted(hidden)), file=args.errf)
     print('Global:', ', '.join(sorted(builtin_macros)), file=args.errf)
     print('User:', ', '.join(sorted(macros)), file=args.errf)
+    print(dir(get_scope()['__macros__']))
 
     for s in args.macro_prefix[1:]:
         macros = []
@@ -925,6 +940,7 @@ def show_macros():
             if not '_' in key:
                 macros.append(key)
         print('Scope %s:'%s, ', '.join(sorted(macros)), file=args.errf)
+        print(dir(get_scope(s)['__macros__']))
 
 import contextlib
 @contextlib.contextmanager

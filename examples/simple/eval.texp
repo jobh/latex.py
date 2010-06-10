@@ -2,8 +2,7 @@
 
 % Eval (and other builtins) are by default not visible as a macros, only in
 % python blocks. We can make it available by binding to a macro name:
-%-eval = eval
-%+__builtin__.get_scope()[r"eval"] = eval
+%@__macros__.eval = eval
 
 $1+3/5 = 1.6$
 
