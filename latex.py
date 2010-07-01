@@ -42,6 +42,9 @@ Note that python3 syntax is used.
     -B
     --show-blocks        Leave exec'ed blocks in the output, commented out
 
+    -N
+    --show-line-numbers  Print line numbers in output file, for debugging
+
     -a <level>
     --abort <level>      Abort on any error that the same verbosity level
                          would print (with -v). It should normally not be set
@@ -238,6 +241,7 @@ class args(object):
     output       = True
     show_macros  = False
     show_blocks  = False
+    show_lines   = False
     two_pass     = False
     block_prefix = '%@'
     macro_prefix = ['@']
@@ -578,6 +582,10 @@ def parse(inf_name):
 
             if l:
                 output.append(l)
+                if args.show_lines:
+                    if lno==1 or len(output)%6==0:
+                        output.append('%%% ' + prefix1[:-1] + '\n')
+
 
     if collected:
         raise RuntimeError('Argument not closed, starting at %s:%d\n>>> '
@@ -874,6 +882,8 @@ def parse_args():
             args.show_macros = True
         elif arg in ['-B', '--show-blocks']:
             args.show_blocks = True
+        elif arg in ['-N', '--show-line-numbers']:
+            args.show_lines = True
         elif arg in ['-a', '--abort']:
             idx += 1
             args.abort = int(sys.argv[idx])
