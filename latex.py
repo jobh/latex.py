@@ -251,6 +251,7 @@ class args(object):
                       r'\{', r'\}',
                       r'\%']
     bracket_escape = '_{_%d}'
+    custom_replacers = []
 
 
 usage_count = collections.defaultdict(int)
@@ -473,6 +474,9 @@ def parse(inf_name):
                 exec_block(lines)
                 lines = ''
                 collected = pop_pending_output()
+
+            for func in args.custom_replacers:
+                l = func(l)
 
             if collected:
                 l = collected+l
