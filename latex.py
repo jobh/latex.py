@@ -965,7 +965,7 @@ def fgrep_file(string, fname):
 def hash_file(fname):
     import hashlib
     m = hashlib.md5()
-    with open(fname) as f:
+    with open(fname, 'rb') as f:
         for l in f:
             m.update(l)
     return m.digest()
