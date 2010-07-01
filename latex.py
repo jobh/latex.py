@@ -656,7 +656,11 @@ class latex_new_comm(object):
         self.set_definition(definition)
         self.finished = True
 
-def latex_newcommand(name, definition=None, redefine=False):
+def latex_newcommand(name=None, definition=None, redefine=False):
+    if name is None:
+        if args.verbose >= 3:
+            log(r'Ignoring \newcommand, not on standard form (no proper argument)')
+        ignore()
     # Check if the command is one that is explicitly ignored by user
     if get_macro(name[1:]) == ignore:
         if args.verbose >= 3:
