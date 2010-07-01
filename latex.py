@@ -987,23 +987,33 @@ def build_latex():
         latex = args.build_type + 'latex'
     if in_path(latex):
         aux_fname = '%s.aux' % args.base_name
+        bbl_fname = '%s.bbl' % args.base_name
         try:
             aux_hash = hash_file(aux_fname)
         except:
             aux_hash = None
+        try:
+            bbl_hash = hash_file(bbl_fname)
+        except:
+            bbl_hash = None
         for i in range(5):
             if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name), i):
                 print('=== Error in build:')
                 system("grep -A15 -m1 '^!' %s.log" % args.base_name, i)
                 sys.exit(1)
-            new_hash = hash_file(aux_fname)
-            if new_hash == aux_hash:
+            new_aux_hash = hash_file(aux_fname)
+            redo_because_of_bibtex = False
+            if i == 0 and fgrep_file(r'\bibdata{', aux_fname):
+                system('bibtex %s' % args.base_name, i)
+                if bbl_hash != hash_file(bbl_fname):
+                    redo_because_of_bibtex = True
+                else:
+                    print('=== No change in %s' % bbl_fname)
+            if new_aux_hash == aux_hash and not redo_because_of_bibtex:
                 print('=== No change in %s; build finished' % aux_fname)
                 break
             else:
-                aux_hash = new_hash
-            if i == 0 and fgrep_file(r'\bibdata{', aux_fname):
-                system('bibtex %s' % args.base_name, i)
+                aux_hash = new_aux_hash
     else:
         print('*** Error: "%s" not found in PATH, skipping build.' % latex, file=args.errf)
         print('*** Use "-o %s" instead, and run latex on that one yourself.' % args.outf_name,
