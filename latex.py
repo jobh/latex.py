@@ -983,41 +983,57 @@ def hash_file(fname):
             m.update(l)
     return m.digest()
 
+def system(cmd, i):
+    if args.verbose > 0:
+        print('[%d]'%i, cmd, file=args.errf)
+    return os.system(cmd)
+
+def build_bibtex(aux_fname):
+    aux_files = []
+    if fgrep_file(r'\gdef\bu@bibdata{', aux_fname):
+        import glob
+        aux_files = glob.glob('bu[0-9]*.aux')
+    elif fgrep_file(r'\bibdata{', aux_fname):
+        aux_files = [aux_fname]
+    if not aux_files:
+        return False
+
+    redo = False
+    for  aux_f in aux_files:
+        bbl_fname = '%s.bbl' % aux_f[:-4]
+        try:
+            bbl_hash = hash_file(bbl_fname)
+        except:
+            bbl_hash = None
+        system('bibtex %s' % aux_f[:-4], 1)
+        if bbl_hash != hash_file(bbl_fname):
+            redo = True
+            print('=== %s changed' % bbl_fname)
+        else:
+            print('=== No change in %s' % bbl_fname)
+    return redo
+    
+
 def build_latex():
     """Run *latex/bibtex until .aux file no longer changes (max 5 times)."""
     global args
-    def system(cmd, N):
-        if args.verbose > 0:
-            print('[%d]'%(N+1), cmd, file=args.errf)
-        return os.system(cmd)
     if args.build_type == 'dvi':
         latex = 'latex'
     else:
         latex = args.build_type + 'latex'
     if in_path(latex):
         aux_fname = '%s.aux' % args.base_name
-        bbl_fname = '%s.bbl' % args.base_name
         try:
             aux_hash = hash_file(aux_fname)
         except:
             aux_hash = None
-        try:
-            bbl_hash = hash_file(bbl_fname)
-        except:
-            bbl_hash = None
         for i in range(5):
-            if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name), i):
+            if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name), i+1):
                 print('=== Error in build:')
-                system("grep -A15 -m1 '^!' %s.log" % args.base_name, i)
+                system("grep -A15 -m1 '^!' %s.log" % args.base_name, i+1)
                 sys.exit(1)
             new_aux_hash = hash_file(aux_fname)
-            redo_because_of_bibtex = False
-            if i == 0 and fgrep_file(r'\bibdata{', aux_fname):
-                system('bibtex %s' % args.base_name, i)
-                if bbl_hash != hash_file(bbl_fname):
-                    redo_because_of_bibtex = True
-                else:
-                    print('=== No change in %s' % bbl_fname)
+            redo_because_of_bibtex = (i==0 and build_bibtex(aux_fname))
             if new_aux_hash == aux_hash and not redo_because_of_bibtex:
                 print('=== No change in %s; build finished' % aux_fname)
                 break
