@@ -91,8 +91,7 @@ Note that python3 syntax is used.
 
 === Known bugs / limitations ===
 
-Text passed to macros may not contain three double quotes (""") in a row or
-end with a bare backslash (\).
+Text passed to macros may not contain three double quotes (""") in a row.
 
 === License, author ===
 
@@ -298,7 +297,7 @@ def consume_arg(l, brak):
         if level == 0:
             (arg, rest_of_line) = l[1:pos-1], l[pos:]
             assert not '"""' in arg
-            return ('r"""%s"""'%arg, rest_of_line)
+            return ('r"""%s^"""[:-1]'%arg, rest_of_line)
     raise TypeError('Argument not closed')
 
 # Return as many arguments as possible. Ignore spaces between arguments,
@@ -331,20 +330,20 @@ def consume_args(l):
 replacers = [
     # Convert and format RHS literal strings
     #    return : \vec{#(x)}
-    #--> return prepare_format(r"""\vec{#(x)}""", True).format(**locals())
+    #--> return prepare_format(r"""\vec{#(x)}^"""[:-1], True).format(**locals())
     #    del = : \nabla
-    #--> del = prepare_format(r"""\nabla""", True).format(**locals())
+    #--> del = prepare_format(r"""\nabla^"""[:-1], True).format(**locals())
     (re.compile(r'^(\s*([%s_.]*\s*=|return))\s*:\s*(\S.*)$'%args.pattern),
-     r'\1 __builtin__.prepare_format(r"""\3""", kwargs_only=True).format(**__builtin__.locals())'),
+     r'\1 __builtin__.prepare_format(r"""\3^"""[:-1], kwargs_only=True).format(**__builtin__.locals())'),
     # Convert reserved words. Only at beginning of line (outer scope).
-    #    del = prepare_format(r"""\nabla"", True).format(**locals())
+    #    del = prepare_format(r"""\nabla^"""[:-1], True).format(**locals())
     #--> get_scope()[r"del"] = ...
     (re.compile(r'^([%s]*)\s*='%args.pattern),
      r'__builtin__.get_scope()[r"\1"] ='),
     #    : \vec{#(x)}
-    #--> output(prepare_format(r"""\vec{%(x)s}""").format(**locals()))
+    #--> output(prepare_format(r"""\vec{%(x)s}^"""[:-1]).format(**locals()))
     (re.compile(r'^(\s*):\s*(.*)$'),
-     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2""").format(**__builtin__.locals()))'), 
+     r'\1__builtin__.output(__builtin__.prepare_format(r"""\2^"""[:-1]).format(**__builtin__.locals()))'), 
     ]
 
 def fixup_line(l):
@@ -534,7 +533,7 @@ def parse(inf_name):
                             if comm_obj is None:
                                 comm_obj = scope.get('__missing__')
                                 if comm_obj is not None:
-                                    comm_args = 'r"""%s""",'%comm + comm_args
+                                    comm_args = 'r"""%s^"""[:-1],'%comm + comm_args
                                     comm = '__missing__'
                             if comm_obj is None:
                                 raise KeyError(comm)
