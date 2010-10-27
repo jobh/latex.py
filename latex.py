@@ -977,6 +977,8 @@ def fgrep_file(string, fname):
                 return True
 
 def hash_file(fname):
+    if not os.path.exists(fname):
+        return None
     import hashlib
     m = hashlib.md5()
     with open(fname, 'rb') as f:
@@ -1002,10 +1004,7 @@ def build_bibtex(aux_fname):
     redo = False
     for  aux_f in aux_files:
         bbl_fname = '%s.bbl' % aux_f[:-4]
-        try:
-            bbl_hash = hash_file(bbl_fname)
-        except:
-            bbl_hash = None
+        bbl_hash = hash_file(bbl_fname)
         system('bibtex %s' % aux_f[:-4], 1)
         if bbl_hash != hash_file(bbl_fname):
             redo = True
@@ -1018,16 +1017,10 @@ def build_bibtex(aux_fname):
 def build_latex():
     """Run *latex/bibtex until .aux file no longer changes (max 5 times)."""
     global args
-    if args.build_type == 'dvi':
-        latex = 'latex'
-    else:
-        latex = args.build_type + 'latex'
+    latex = args.build_type+'latex' if args.build_type!='dvi' else 'latex'
     if in_path(latex):
         aux_fname = '%s.aux' % args.base_name
-        try:
-            aux_hash = hash_file(aux_fname)
-        except:
-            aux_hash = None
+        aux_hash = hash_file(aux_fname)
         for i in range(5):
             if system('%s -interaction=batchmode %s >/dev/null' % (latex, args.outf_name), i+1):
                 print('=== Error in build:')
@@ -1070,4 +1063,7 @@ if __name__ == '__main__':
     if v < 2.6:
         print('python version 2.6 or higher required (%.1f found)' % v, file=sys.stderr)
         sys.exit(1)
+    if v < 3.0:
+        print('* Warning: python versions below 3 may cause trouble with\n* unicode input (e.g., \\w in regexps)',
+              file=sys.stderr)
     main()
