@@ -249,7 +249,8 @@ class args(object):
     pattern      = r'a-zA-Z0-9*'
     version      = 2.00
 
-    bracket_words  = [r'\left[', r'\right]', 
+    bracket_words  = [r'\\', # Simplifies parsing to get rid of this first
+                      r'\left[', r'\right]', 
                       r'\left{', r'\right}',
                       r'\{', r'\}',
                       r'\%']
@@ -489,10 +490,10 @@ def parse(inf_name):
             # all arguments are present (i.e., until braces are balanced and 
             # line continuations (%) are eaten).
             if any(prefix in l for prefix in args.macro_prefix):
+                l = bracket_escape(l)
                 if '%' in l:
                     collected = l[:l.index('%')]
                     continue
-                l = bracket_escape(l)
 
                 re_string = r'[%s]([%s]*)[^%s]' \
                     % (re.escape(''.join(args.macro_prefix)), args.pattern, args.pattern)
