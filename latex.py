@@ -857,6 +857,12 @@ def ensure_math(func):
 # Command-line invocation
 ##########################################################################
 
+@builtin
+def include(fname):
+    with open(fname) as f:
+        code = map(fixup_line, f.readlines())
+        exec_block(''.join(code))
+
 def parse_args():
     global args
 
@@ -889,8 +895,7 @@ def parse_args():
             args.abort = int(sys.argv[idx])
         elif arg in ['-i', '--include']:
             idx += 1
-            code = map(fixup_line, open(sys.argv[idx]).readlines())
-            exec_block(''.join(code))
+            include(sys.argv[idx])
         elif arg in ['-e', '--expression']:
             idx += 1
             code = fixup_line(sys.argv[idx])
