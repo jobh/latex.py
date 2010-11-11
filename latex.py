@@ -275,9 +275,10 @@ def pop_pending_output():
 
 @builtin
 def prepare_format(s, kwargs_only=False):
-    pattern = args.format_pattern.format(r'([a-zA-Z0-9)_]*[a-zA-Z_][a-zA-Z0-9)_]*)' if kwargs_only else r'([a-zA-Z0-9_]+)')
+    pattern = args.format_pattern.format(r'([a-zA-Z0-9_]*[a-zA-Z_][a-zA-Z0-9_]*)' if kwargs_only else r'([a-zA-Z0-9_]+)')
     s = s.replace('{', '{{').replace('}', '}}')
-    s = re.sub(pattern, r'{\1}', s)
+    print (pattern, s, re.search(pattern, s) and re.search(pattern,s).groups())
+    s = re.sub(pattern, lambda m: '{%s}'%(m.group(1) or m.group(2) or ''), s)
     return s
 
 @builtin
