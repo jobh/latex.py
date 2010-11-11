@@ -244,6 +244,7 @@ class args(object):
     two_pass     = False
     block_prefix = '%@'
     macro_prefix = ['@']
+    format_pattern = r'(?:#\({0}\)|<{0}>)'
     escape       = ('{_}', '{__}', '{___}', '{____}')
     dummy        = '{^}'
     pattern      = r'a-zA-Z0-9*'
@@ -272,13 +273,11 @@ def pop_pending_output():
     pending_output = []
     return ret
 
-format_replacer = (re.compile(r'#\(([^)]+)\)'), r'{\1}')
-format_replacer2 = (re.compile(r'#\(([^0-9)]+)\)'), r'{\1}')
 @builtin
 def prepare_format(s, kwargs_only=False):
-    replace_re, replace_with = format_replacer2 if kwargs_only else format_replacer
+    pattern = args.format_pattern.format(r'([a-zA-Z0-9)_]*[a-zA-Z_][a-zA-Z0-9)_]*)' if kwargs_only else r'([a-zA-Z0-9_]+)')
     s = s.replace('{', '{{').replace('}', '}}')
-    s = replace_re.sub(replace_with, s)
+    s = re.sub(pattern, r'{\1}', s)
     return s
 
 @builtin
