@@ -685,7 +685,7 @@ def latex_newcommand(name=None, definition=None, redefine=False):
     if not command.finished:
         return name             # finish definition in new_comm.__call__
 
-def latex_renewcommand(name, definition=None):
+def latex_renewcommand(name=None, definition=None):
     return latex_newcommand(name, definition, redefine=True)
 
 def latex_input(name):
