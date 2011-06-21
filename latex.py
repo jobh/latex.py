@@ -1009,7 +1009,10 @@ def build_bibtex(aux_fname):
     for  aux_f in aux_files:
         bbl_fname = '%s.bbl' % aux_f[:-4]
         bbl_hash = hash_file(bbl_fname)
-        system('bibtex %s' % aux_f[:-4], 1)
+        if in_path('bibtex8'):
+            system('bibtex8 -c ascii -W %s' % aux_f[:-4], 1)
+        else:
+            system('bibtex %s' % aux_f[:-4], 1)
         if bbl_hash != hash_file(bbl_fname):
             redo = True
             print('=== %s changed' % bbl_fname)
