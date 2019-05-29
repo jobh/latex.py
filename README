@@ -9,15 +9,15 @@ Since then, it has grown a bit. There are now three main use cases:
 
 1) Write macros in python. Because it's simpler? More powerful libraries?
    Use '@' instead of '\' as macro prefix. Typical build process:
-       python parse.py -i macros.py -o manuscript.pdf manuscript.tex
+       python latex.py -i macros.py -o manuscript.pdf manuscript.tex
 
 2) Expand user-defined macros in text, because some journals don't like these.
    Uses '\' as macro prefix, but replaces as many as possible with their
    expansions.
-       python parse.py -L -o manuscript.texp manuscript.tex
+       python latex.py -L -o manuscript.texp manuscript.tex
 
 3) Parse a latex file to determine its dependencies, for use in makefiles etc.
-       deps=$(python parse.py -L \
+       deps=$(python latex.py -L \
               -P includegraphics:1:%s.pdf \
               -P input:1:%s.tex \
               -P bibliography:1:%s.bib \
@@ -63,7 +63,7 @@ Furthermore, a macro can either be a string (as in lines [1] and [3]), or
 a function (as in [2]). Strings are formatted using the arguments to the
 macro.
 
-[4]: Yes, parse.py understands \newcommand when the -L flag is given. It
+[4]: Yes, latex.py understands \newcommand when the -L flag is given. It
 can be used on an unmodified latex file to expand all user-defined macros.
 
 
